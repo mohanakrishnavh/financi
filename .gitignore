@@ -171,6 +171,11 @@ local.settings.json
 *.zip
 function-app*.zip
 
+# Local credentials and sensitive files
+.azure-credentials
+*.credentials
+.env.local
+
 # Azure Bicep compiled files
 *.json
 !parameters.json

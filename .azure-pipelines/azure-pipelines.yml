@@ -44,8 +44,16 @@ stages:
       displayName: 'Use Python $(pythonVersion)'
     
     - script: |
+        # Upgrade pip and install build tools
         python -m pip install --upgrade pip wheel setuptools
-        # Install build essentials for grpcio if needed
+        
+        # Install build essentials for potential compilation fallbacks
+        sudo apt-get update && sudo apt-get install -y build-essential
+        
+        # Install grpcio packages first with aggressive wheel preference
+        pip install --only-binary=grpcio,grpcio-tools --prefer-binary --no-cache-dir grpcio==1.60.1 grpcio-tools==1.60.1
+        
+        # Install remaining dependencies
         pip install --prefer-binary --no-cache-dir -r requirements.txt
       displayName: 'Install dependencies'
       workingDirectory: '$(System.DefaultWorkingDirectory)'
