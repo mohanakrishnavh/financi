@@ -1,17 +1,17 @@
 @description('The name of the function app.')
-param functionAppName string = 'financi-${uniqueString(resourceGroup().id)}'
+param functionAppName string = 'financi'
 
 @description('The location for all resources.')
 param location string = resourceGroup().location
 
 @description('The name of the storage account.')
-param storageAccountName string = 'financi${uniqueString(resourceGroup().id)}'
+param storageAccountName string = 'financistorage'
 
 @description('The name of the hosting plan.')
-param hostingPlanName string = 'financi-plan-${uniqueString(resourceGroup().id)}'
+param hostingPlanName string = 'financi-plan'
 
 @description('The name of the Application Insights instance.')
-param appInsightsName string = 'financi-insights-${uniqueString(resourceGroup().id)}'
+param appInsightsName string = 'financi-insights'
 
 @description('The pricing tier for the hosting plan.')
 @allowed([

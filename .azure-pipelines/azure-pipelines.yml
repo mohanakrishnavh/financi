@@ -139,6 +139,23 @@ stages:
                 echo "Function App Name: $(functionAppName)"
                 echo "Location: $(location)"
                 
+                # Check if function app already exists
+                if az functionapp show --name $(functionAppName) --resource-group $(resourceGroupName) >/dev/null 2>&1; then
+                  echo "✅ Function App '$(functionAppName)' already exists. Using incremental deployment."
+                else
+                  echo "🆕 Function App '$(functionAppName)' doesn't exist. Creating new resources."
+                fi
+                
+                # Deploy with --what-if first to show changes
+                echo "📋 Checking what changes will be made..."
+                az deployment group what-if \
+                  --resource-group $(resourceGroupName) \
+                  --template-file $(Pipeline.Workspace)/infrastructure/main.bicep \
+                  --parameters $(Pipeline.Workspace)/infrastructure/parameters.json \
+                  --parameters functionAppName=$(functionAppName) \
+                  --parameters location="$(location)"
+                
+                # Proceed with actual deployment
                 az deployment group create \
                   --resource-group $(resourceGroupName) \
                   --template-file $(Pipeline.Workspace)/infrastructure/main.bicep \
@@ -146,7 +163,7 @@ stages:
                   --parameters functionAppName=$(functionAppName) \
                   --parameters location="$(location)" \
                   --mode Incremental \
-                  --verbose
+                  --no-wait false
           
           - task: AzureCLI@2
             displayName: 'Get Function App Details'
