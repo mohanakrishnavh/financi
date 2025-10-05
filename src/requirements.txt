@@ -5,12 +5,8 @@ azure-functions>=1.18.0
 wheel>=0.37.0
 setuptools>=65.0.0
 
-# gRPC dependencies - using specific versions with guaranteed pre-built wheels
-# These versions are known to have wheels for most platforms
-grpcio==1.60.1
-grpcio-tools==1.60.1
-
 # MCP (Model Context Protocol) dependencies
+# Note: grpcio versions will be determined by azure-functions-worker compatibility
 mcp>=1.0.0
 
 # HTTP client for API calls

@@ -50,10 +50,7 @@ stages:
         # Install build essentials for potential compilation fallbacks
         sudo apt-get update && sudo apt-get install -y build-essential
         
-        # Install grpcio packages first with aggressive wheel preference
-        pip install --only-binary=grpcio,grpcio-tools --prefer-binary --no-cache-dir grpcio==1.60.1 grpcio-tools==1.60.1
-        
-        # Install remaining dependencies
+        # Install dependencies with wheel preference - let azure-functions-worker determine grpcio versions
         pip install --prefer-binary --no-cache-dir -r requirements.txt
       displayName: 'Install dependencies'
       workingDirectory: '$(System.DefaultWorkingDirectory)'
