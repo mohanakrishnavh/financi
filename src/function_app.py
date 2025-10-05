@@ -153,7 +153,7 @@ def calculate_portfolio_value(context) -> str:
         return f"Error calculating portfolio value: {str(e)}"
 
 
-@app.route(route="health")
+@app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
 def health(req: func.HttpRequest) -> func.HttpResponse:
     """Health check endpoint for monitoring"""
     logging.info('Health check requested.')
