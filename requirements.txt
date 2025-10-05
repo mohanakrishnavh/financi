@@ -2,6 +2,14 @@
 azure-functions>=1.18.0
 azure-functions-worker>=1.0.0
 
+# Build tools for grpc dependencies
+wheel>=0.37.0
+setuptools>=65.0.0
+
+# gRPC dependencies (with specific versions that have pre-built wheels)
+grpcio>=1.50.0,<1.60.0
+grpcio-tools>=1.50.0,<1.60.0
+
 # MCP (Model Context Protocol) dependencies
 mcp>=1.0.0
 

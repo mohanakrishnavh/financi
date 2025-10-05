@@ -167,6 +167,10 @@ local.settings.json
 .vscode/
 .azure/
 
+# Build artifacts and deployment packages
+*.zip
+function-app*.zip
+
 # Azure Bicep compiled files
 *.json
 !parameters.json
