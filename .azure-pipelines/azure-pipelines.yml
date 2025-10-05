@@ -162,8 +162,7 @@ stages:
                   --parameters $(Pipeline.Workspace)/infrastructure/parameters.json \
                   --parameters functionAppName=$(functionAppName) \
                   --parameters location="$(location)" \
-                  --mode Incremental \
-                  --no-wait false
+                  --mode Incremental
           
           - task: AzureCLI@2
             displayName: 'Get Function App Details'
