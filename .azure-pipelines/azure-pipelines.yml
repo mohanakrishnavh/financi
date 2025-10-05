@@ -184,12 +184,21 @@ stages:
           - download: current
             artifact: function-app
           
+          - task: PowerShell@2
+            displayName: 'Debug Variables'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "functionAppName variable: $(functionAppName)"
+                Write-Host "All variables:"
+                Get-ChildItem env: | Where-Object {$_.Name -like "*function*"}
+          
           - task: AzureFunctionApp@1
             displayName: 'Deploy to Azure Function App'
             inputs:
               azureSubscription: $(azureServiceConnection)
               appType: 'functionAppLinux'
-              appName: $(functionAppName)
+              appName: 'financi'
               package: '$(Pipeline.Workspace)/function-app/function-app.zip'
           
           - task: AzureCLI@2
@@ -201,7 +210,7 @@ stages:
               inlineScript: |
                 # Set environment variables including API key
                 az functionapp config appsettings set \
-                  --name $(functionAppName) \
+                  --name financi \
                   --resource-group $(resourceGroupName) \
                   --settings \
                     "MCP_SERVER_NAME=financi" \
@@ -234,7 +243,7 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           functionUrl=$(az functionapp show \
-            --name $(functionAppName) \
+            --name financi \
             --resource-group $(resourceGroupName) \
             --query defaultHostName -o tsv)
           
