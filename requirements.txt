@@ -2,13 +2,13 @@
 azure-functions>=1.18.0
 azure-functions-worker>=1.0.0
 
-# Build tools for grpc dependencies
+# Build tools for compilation fallbacks
 wheel>=0.37.0
 setuptools>=65.0.0
 
-# MCP (Model Context Protocol) dependencies
-# Note: grpcio versions will be determined by azure-functions-worker compatibility
-mcp>=1.0.0
+# Temporarily removing MCP dependency to avoid grpcio build issues
+# Will implement MCP functionality using alternative approaches
+# mcp>=1.0.0  # TODO: Re-enable once grpcio issues are resolved
 
 # HTTP client for API calls
 aiohttp>=3.8.0
