@@ -169,14 +169,14 @@ stages:
     - Build
     - DeployInfrastructure
   condition: succeeded()
-  variables:
-    functionAppName: $[ stageDependencies.DeployInfrastructure.DeployBicep.outputs['getFunctionAppName.functionAppName'] ]
   jobs:
   - deployment: DeployFunctionApp
     displayName: 'Deploy Function Code'
     pool:
       vmImage: $(vmImageName)
     environment: 'function-app'
+    variables:
+      functionAppName: $[ stageDependencies.DeployInfrastructure.DeployBicep.outputs['getFunctionAppName.functionAppName'] ]
     strategy:
       runOnce:
         deploy:
@@ -217,13 +217,13 @@ stages:
     - DeployInfrastructure
     - DeployFunction
   condition: succeeded()
-  variables:
-    functionAppName: $[ stageDependencies.DeployInfrastructure.DeployBicep.outputs['getFunctionAppName.functionAppName'] ]
   jobs:
   - job: ValidateDeployment
     displayName: 'Validate Function App'
     pool:
       vmImage: $(vmImageName)
+    variables:
+      functionAppName: $[ stageDependencies.DeployInfrastructure.DeployBicep.outputs['getFunctionAppName.functionAppName'] ]
     
     steps:
     - task: AzureCLI@2

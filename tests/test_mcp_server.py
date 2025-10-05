@@ -1,173 +1,228 @@
 """
-Unit tests for Financi MCP Server
+Unit tests for Financi MCP Server Azure Functions
 """
 
 import pytest
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import MagicMock
 import sys
 import os
 
 # Add src to path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from function_app import FinanciMCPServer
+import azure.functions as func
+from function_app import hello_financi, get_stock_price, calculate_portfolio_value, health
 
-class TestFinanciMCPServer:
-    """Test suite for Financi MCP Server."""
+class TestMCPFunctions:
+    """Test suite for MCP Azure Functions."""
     
-    @pytest.fixture
-    def mcp_server(self):
-        """Create MCP server instance for testing."""
-        return FinanciMCPServer()
+    def test_hello_financi(self):
+        """Test hello_financi function."""
+        result = hello_financi(None)
+        
+        assert isinstance(result, str)
+        assert "Hello! I am the Financi MCP server" in result
+        assert "financial data assistant" in result
     
-    def test_server_initialization(self, mcp_server):
-        """Test that server initializes correctly."""
-        assert mcp_server.server.name == "financi"
-        assert hasattr(mcp_server, 'server')
-    
-    @pytest.mark.asyncio
-    async def test_get_stock_price_success(self, mcp_server):
-        """Test successful stock price retrieval."""
-        mock_response_data = {
-            "Global Quote": {
-                "01. symbol": "AAPL",
-                "05. price": "150.00",
-                "09. change": "2.50",
-                "10. change percent": "+1.69%",
-                "06. volume": "1000000",
-                "07. latest trading day": "2024-01-01",
-                "08. previous close": "147.50"
+    def test_get_stock_price_valid_symbol(self):
+        """Test get_stock_price with valid symbol."""
+        # Create mock context with AAPL symbol
+        context_data = {
+            "arguments": {
+                "symbol": "AAPL"
             }
         }
+        context = json.dumps(context_data)
         
-        with patch('aiohttp.ClientSession.get') as mock_get:
-            mock_response = AsyncMock()
-            mock_response.json.return_value = mock_response_data
-            mock_get.return_value.__aenter__.return_value = mock_response
-            
-            with patch.dict(os.environ, {'ALPHA_VANTAGE_API_KEY': 'test_key'}):
-                result = await mcp_server._get_stock_price("AAPL")
-                
-                assert result["symbol"] == "AAPL"
-                assert result["price"] == 150.00
-                assert result["change"] == 2.50
+        result = get_stock_price(context)
+        
+        # Parse the JSON result
+        result_data = json.loads(result)
+        
+        assert result_data["symbol"] == "AAPL"
+        assert "price" in result_data
+        assert "currency" in result_data
+        assert "timestamp" in result_data
+        assert result_data["status"] == "success"
+        assert isinstance(result_data["price"], (int, float))
     
-    @pytest.mark.asyncio
-    async def test_get_stock_price_no_api_key(self, mcp_server):
-        """Test stock price retrieval without API key."""
-        with patch.dict(os.environ, {}, clear=True):
-            result = await mcp_server._get_stock_price("AAPL")
-            
-            assert "error" in result
-            assert "API key not configured" in result["error"]
-    
-    @pytest.mark.asyncio
-    async def test_get_crypto_price_success(self, mcp_server):
-        """Test successful crypto price retrieval."""
-        mock_response_data = {
-            "bitcoin": {
-                "usd": 45000.00,
-                "usd_24h_change": 2.5,
-                "usd_24h_vol": 25000000000,
-                "usd_market_cap": 850000000000
+    def test_get_stock_price_no_symbol(self):
+        """Test get_stock_price with no symbol."""
+        # Create mock context with empty symbol
+        context_data = {
+            "arguments": {
+                "symbol": ""
             }
         }
+        context = json.dumps(context_data)
         
-        with patch('aiohttp.ClientSession.get') as mock_get:
-            mock_response = AsyncMock()
-            mock_response.json.return_value = mock_response_data
-            mock_get.return_value.__aenter__.return_value = mock_response
-            
-            result = await mcp_server._get_crypto_price("bitcoin")
-            
-            assert result["symbol"] == "BITCOIN"
-            assert result["price"] == 45000.00
-            assert result["change_24h"] == 2.5
+        result = get_stock_price(context)
+        
+        assert "No stock symbol provided" in result
     
-    def test_calculate_rsi(self, mcp_server):
-        """Test RSI calculation."""
-        # Sample price data for RSI calculation
-        prices = [100, 102, 101, 103, 102, 105, 104, 106, 105, 107, 106, 108, 107, 109, 108]
+    def test_get_stock_price_invalid_context(self):
+        """Test get_stock_price with invalid context."""
+        context = "invalid json"
         
-        rsi = mcp_server._calculate_rsi(prices, 14)
+        result = get_stock_price(context)
         
-        assert rsi is not None
-        assert 0 <= rsi <= 100
-        assert isinstance(rsi, float)
+        assert "Error retrieving stock price" in result
     
-    def test_calculate_sma(self, mcp_server):
-        """Test Simple Moving Average calculation."""
-        prices = [100, 102, 101, 103, 102, 105, 104, 106, 105, 107]
-        
-        sma_5 = mcp_server._calculate_sma(prices, 5)
-        
-        assert sma_5 is not None
-        assert sma_5 == sum(prices[-5:]) / 5
-    
-    def test_calculate_ema(self, mcp_server):
-        """Test Exponential Moving Average calculation."""
-        prices = [100, 102, 101, 103, 102, 105, 104, 106, 105, 107]
-        
-        ema = mcp_server._calculate_ema(prices, 5)
-        
-        assert ema is not None
-        assert isinstance(ema, float)
-    
-    @pytest.mark.asyncio
-    async def test_portfolio_analysis_mixed(self, mcp_server):
-        """Test portfolio analysis with mixed assets."""
-        holdings = [
-            {"symbol": "AAPL", "quantity": 10, "type": "stock"},
-            {"symbol": "bitcoin", "quantity": 0.5, "type": "crypto"}
-        ]
-        
-        stock_mock_data = {
-            "symbol": "AAPL",
-            "price": 150.00,
-            "change_percent": "+1.69%"
+    def test_calculate_portfolio_value_valid_inputs(self):
+        """Test calculate_portfolio_value with valid inputs."""
+        # Create mock context
+        context_data = {
+            "arguments": {
+                "symbol": "MSFT",
+                "amount": 10
+            }
         }
+        context = json.dumps(context_data)
         
-        crypto_mock_data = {
-            "symbol": "BITCOIN",
-            "price": 45000.00,
-            "change_24h": 2.5
+        result = calculate_portfolio_value(context)
+        
+        # Parse the JSON result
+        result_data = json.loads(result)
+        
+        assert result_data["symbol"] == "MSFT"
+        assert result_data["shares"] == 10
+        assert "price_per_share" in result_data
+        assert "total_value" in result_data
+        assert result_data["status"] == "success"
+        assert isinstance(result_data["total_value"], (int, float))
+        assert result_data["total_value"] > 0
+    
+    def test_calculate_portfolio_value_no_symbol(self):
+        """Test calculate_portfolio_value with no symbol."""
+        context_data = {
+            "arguments": {
+                "symbol": "",
+                "amount": 10
+            }
         }
+        context = json.dumps(context_data)
         
-        with patch.object(mcp_server, '_get_stock_price', return_value=stock_mock_data) as mock_stock, \
-             patch.object(mcp_server, '_get_crypto_price', return_value=crypto_mock_data) as mock_crypto:
-            
-            result = await mcp_server._portfolio_analysis(holdings)
-            
-            assert "total_value" in result
-            assert "holdings" in result
-            assert "diversification" in result
-            assert len(result["holdings"]) == 2
-            
-            # Check that both methods were called
-            mock_stock.assert_called_once_with("AAPL")
-            mock_crypto.assert_called_once_with("bitcoin")
+        result = calculate_portfolio_value(context)
+        
+        assert "No stock symbol provided" in result
+    
+    def test_calculate_portfolio_value_invalid_amount(self):
+        """Test calculate_portfolio_value with invalid amount."""
+        context_data = {
+            "arguments": {
+                "symbol": "GOOGL",
+                "amount": 0
+            }
+        }
+        context = json.dumps(context_data)
+        
+        result = calculate_portfolio_value(context)
+        
+        assert "Invalid share amount provided" in result
+    
+    def test_calculate_portfolio_value_negative_amount(self):
+        """Test calculate_portfolio_value with negative amount."""
+        context_data = {
+            "arguments": {
+                "symbol": "GOOGL",
+                "amount": -5
+            }
+        }
+        context = json.dumps(context_data)
+        
+        result = calculate_portfolio_value(context)
+        
+        assert "Invalid share amount provided" in result
 
-class TestHealthCheck:
-    """Test health check functionality."""
+class TestHealthEndpoint:
+    """Test health check HTTP endpoint."""
     
-    def test_health_endpoint_structure(self):
-        """Test that health check returns proper structure."""
-        # This would test the actual HTTP function, but we need a mock Azure Functions context
-        # For now, just test the basic functionality
-        from function_app import health_check
+    def test_health_endpoint_success(self):
+        """Test health endpoint returns correct response."""
+        # Create a mock HTTP request
+        mock_request = MagicMock(spec=func.HttpRequest)
         
-        # Create a mock request
-        mock_req = MagicMock()
+        response = health(mock_request)
         
-        response = health_check(mock_req)
-        
+        # Verify response structure
+        assert isinstance(response, func.HttpResponse)
         assert response.status_code == 200
-        assert response.mimetype == "application/json"
         
-        # Parse the JSON response
+        # Parse response body
         response_data = json.loads(response.get_body())
-        assert "status" in response_data
+        
+        # Verify response content
         assert response_data["status"] == "healthy"
-        assert "server" in response_data
-        assert "version" in response_data
+        assert "timestamp" in response_data
+        assert response_data["service"] == "financi-mcp"
+        assert response_data["version"] == "1.0.0"
+        assert "mcp_endpoint" in response_data
+    
+    def test_health_endpoint_content_type(self):
+        """Test health endpoint returns correct content type."""
+        mock_request = MagicMock(spec=func.HttpRequest)
+        
+        response = health(mock_request)
+        
+        # Check headers
+        headers = dict(response.headers) if hasattr(response, 'headers') else {}
+        assert headers.get("Content-Type") == "application/json"
+
+class TestToolProperties:
+    """Test tool properties and configuration."""
+    
+    def test_tool_properties_import(self):
+        """Test that tool properties can be imported."""
+        from function_app import (
+            tool_properties_get_stock_price,
+            tool_properties_calculate_portfolio,
+            ToolProperty
+        )
+        
+        # Verify tool properties exist
+        assert tool_properties_get_stock_price is not None
+        assert tool_properties_calculate_portfolio is not None
+        assert len(tool_properties_get_stock_price) > 0
+        assert len(tool_properties_calculate_portfolio) > 0
+    
+    def test_tool_property_structure(self):
+        """Test ToolProperty class structure."""
+        from function_app import ToolProperty
+        
+        prop = ToolProperty("test_name", "string", "Test description")
+        
+        assert prop.propertyName == "test_name"
+        assert prop.propertyType == "string"
+        assert prop.description == "Test description"
+        
+        # Test to_dict method
+        prop_dict = prop.to_dict()
+        assert prop_dict["propertyName"] == "test_name"
+        assert prop_dict["propertyType"] == "string"
+        assert prop_dict["description"] == "Test description"
+
+# Integration tests
+class TestIntegration:
+    """Integration tests for the complete function app."""
+    
+    def test_function_app_initialization(self):
+        """Test that the function app can be imported without errors."""
+        from function_app import app
+        
+        assert app is not None
+        assert hasattr(app, 'function_name')
+    
+    def test_all_functions_exist(self):
+        """Test that all expected functions exist and are callable."""
+        from function_app import (
+            hello_financi,
+            get_stock_price,
+            calculate_portfolio_value,
+            health
+        )
+        
+        assert callable(hello_financi)
+        assert callable(get_stock_price)
+        assert callable(calculate_portfolio_value)
+        assert callable(health)
