@@ -12,8 +12,8 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 // Configuration
-const FUNCTION_APP_URL = 'https://financi.azurewebsites.net';
-const API_KEY = process.env.FINANCI_API_KEY || 'REPLACE_WITH_YOUR_API_KEY';
+const FUNCTION_APP_URL = process.env.FINANCI_SERVER_URL || 'https://financi.azurewebsites.net';
+const API_KEY = process.env.FINANCI_API_KEY;
 
 class FinanciMCPServer {
   constructor() {
