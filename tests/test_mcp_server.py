@@ -59,7 +59,12 @@ class TestMCPFunctions:
         
         result = get_stock_price(context)
         
-        assert "No stock symbol provided" in result
+        # Parse the JSON error response
+        result_data = json.loads(result)
+        
+        assert result_data["error"] == "No stock symbol provided"
+        assert result_data["status"] == "error"
+        assert "timestamp" in result_data
     
     def test_get_stock_price_invalid_context(self):
         """Test get_stock_price with invalid context."""
@@ -67,7 +72,12 @@ class TestMCPFunctions:
         
         result = get_stock_price(context)
         
-        assert "Error retrieving stock price" in result
+        # Parse the JSON error response
+        result_data = json.loads(result)
+        
+        assert result_data["error"] == "Invalid request format"
+        assert result_data["status"] == "error"
+        assert "timestamp" in result_data
     
     def test_calculate_portfolio_value_valid_inputs(self):
         """Test calculate_portfolio_value with valid inputs."""
@@ -105,7 +115,12 @@ class TestMCPFunctions:
         
         result = calculate_portfolio_value(context)
         
-        assert "No stock symbol provided" in result
+        # Parse the JSON error response
+        result_data = json.loads(result)
+        
+        assert result_data["error"] == "No stock symbol provided"
+        assert result_data["status"] == "error"
+        assert "timestamp" in result_data
     
     def test_calculate_portfolio_value_invalid_amount(self):
         """Test calculate_portfolio_value with invalid amount."""
@@ -119,7 +134,12 @@ class TestMCPFunctions:
         
         result = calculate_portfolio_value(context)
         
-        assert "Invalid share amount provided" in result
+        # Parse the JSON error response
+        result_data = json.loads(result)
+        
+        assert result_data["error"] == "Invalid share amount provided. Must be a positive number."
+        assert result_data["status"] == "error"
+        assert "timestamp" in result_data
     
     def test_calculate_portfolio_value_negative_amount(self):
         """Test calculate_portfolio_value with negative amount."""
@@ -133,7 +153,12 @@ class TestMCPFunctions:
         
         result = calculate_portfolio_value(context)
         
-        assert "Invalid share amount provided" in result
+        # Parse the JSON error response
+        result_data = json.loads(result)
+        
+        assert result_data["error"] == "Invalid share amount provided. Must be a positive number."
+        assert result_data["status"] == "error"
+        assert "timestamp" in result_data
 
 class TestHealthEndpoint:
     """Test health check HTTP endpoint."""
