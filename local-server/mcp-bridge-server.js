@@ -128,31 +128,47 @@ class FinanciMCPServer {
   }
 
   async callAzureFunction(functionName, args) {
-    // For now, return mock data since the MCP endpoints aren't accessible
-    // In a real implementation, you'd call the Azure Function HTTP endpoints
-    
-    const mockResponses = {
-      hello_financi: "Hello! I am the Financi MCP server - your financial data assistant!",
-      get_stock_price: JSON.stringify({
-        symbol: args.symbol?.toUpperCase() || "UNKNOWN",
-        price: 150.25,
-        currency: "USD",
-        timestamp: new Date().toISOString(),
-        change: "+2.5%",
-        status: "success (mock data)"
-      }, null, 2),
-      calculate_portfolio_value: JSON.stringify({
-        symbol: args.symbol?.toUpperCase() || "UNKNOWN",
-        shares: args.amount || 0,
-        price_per_share: 150.25,
-        total_value: (args.amount || 0) * 150.25,
-        currency: "USD",
-        timestamp: new Date().toISOString(),
-        status: "success (mock data)"
-      }, null, 2)
-    };
+    if (!API_KEY) {
+      throw new Error('FINANCI_API_KEY environment variable is required');
+    }
 
-    return mockResponses[functionName] || "Function not found";
+    try {
+      // Import fetch for HTTP requests
+      const fetch = (await import('node-fetch')).default;
+      
+      const url = `${FUNCTION_APP_URL}/api/${functionName}`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-functions-key': API_KEY
+      };
+
+      let body = {};
+      if (functionName !== 'hello_financi') {
+        body = { arguments: args };
+      }
+
+      console.error(`Calling Azure Function: ${url}`);
+      console.error(`Request body:`, JSON.stringify(body, null, 2));
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Azure Function call failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.text();
+      console.error(`Azure Function response:`, result);
+      
+      return result;
+      
+    } catch (error) {
+      console.error(`Error calling Azure Function ${functionName}:`, error);
+      throw error;
+    }
   }
 
   async run() {
