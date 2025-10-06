@@ -5,7 +5,19 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![Azure Functions](https://img.shields.io/badge/Azure%20Functions-v4-blue.svg)](https://docs.microsoft.com/en-us/azure/azure-functions/)
 
-Financi is a Python-based Model Context Protocol (MCP) server deployed as an Azure Function App, providing comprehensive financial analysis tools for stocks and cryptocurrencies. This server enables AI assistants and applications to access real-time financial data, perform technical analysis, and calculate financial metrics through a standardized MCP interface.
+Financi is a Python-based Model Context Protocol (MCP) server deployed as an Azure Function App, providing financial analysis tools for stocks through a standardized MCP interface. Built using Microsoft's Azure Functions MCP integration with `@app.generic_trigger` decorators.
+
+## 🚀 Quick Start
+
+**Already Deployed?** Access your Financi MCP server at:
+- **Health Check**: `https://financi.azurewebsites.net/api/health`
+- **MCP Endpoint**: `https://financi.azurewebsites.net/runtime/webhooks/mcp/sse`
+
+**New Installation?** 
+1. Fork this repository to your Azure DevOps organization
+2. Configure the Azure DevOps pipeline with your subscription details  
+3. Run the pipeline to automatically deploy infrastructure and code
+4. Access your deployed functions at `https://financi.azurewebsites.net`
 
 ## 🚀 Features
 
@@ -122,31 +134,106 @@ az functionapp config appsettings set \
 
 ## 📖 Usage
 
-### MCP Client Configuration
+### Accessing the Deployed MCP Server
 
-Configure your MCP client to connect to the deployed Function App:
+After successful deployment via the Azure DevOps pipeline, your Financi MCP server will be available at:
+
+**Function App URL**: `https://financi.azurewebsites.net`
+
+#### Health Check
+First, verify your deployment is working:
+```bash
+curl https://financi.azurewebsites.net/api/health
+```
+
+Expected response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "service": "financi-mcp",
+  "version": "1.0.0",
+  "mcp_endpoint": "/runtime/webhooks/mcp/sse"
+}
+```
+
+### Using with MCP Clients
+
+#### Option 1: Claude Desktop Configuration
+
+Add to your Claude Desktop configuration file (`~/.config/claude-desktop/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "financi": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://your-function-app.azurewebsites.net/api/mcp"
+        "/path/to/financi-mcp-client.js",
+        "https://financi.azurewebsites.net"
       ]
     }
   }
 }
 ```
 
-### Available Tools
+#### Option 2: Direct Azure Functions MCP Integration
 
-#### 1. Get Stock Price
-```javascript
-// Get current stock price
+Since this is deployed as Azure Functions with MCP tool triggers, you can interact with it through Azure's built-in MCP runtime:
+
+**MCP Endpoint**: `https://financi.azurewebsites.net/runtime/webhooks/mcp/sse`
+
+#### Option 3: HTTP API Direct Access
+
+You can also call the individual functions directly via HTTP:
+
+**Stock Price Example**:
+```bash
+# Get current stock price for Apple
+curl -X POST "https://financi.azurewebsites.net/api/orchestrators/get_stock_price" \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "AAPL"}'
+```
+
+**Portfolio Analysis Example**:
+```bash
+# Analyze a mixed portfolio
+curl -X POST "https://financi.azurewebsites.net/api/orchestrators/calculate_portfolio_value" \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "MSFT", "amount": 10}'
+```
+
+### Available MCP Tools
+
+The Financi MCP server provides the following tools through Azure Functions MCP integration:
+
+### Available MCP Tools
+
+The server provides three main financial analysis tools deployed as Azure Functions:
+
+#### 1. Hello Financi (`hello_financi`)
+Simple greeting tool to verify MCP connectivity.
+
+**MCP Tool Call:**
+```json
 {
-  "name": "get_stock_price",
+  "tool": "hello_financi",
+  "arguments": {}
+}
+```
+
+**Response:**
+```
+"Hello! I am the Financi MCP server - your financial data assistant!"
+```
+
+#### 2. Get Stock Price (`get_stock_price`)
+Retrieves current stock price and market data for a given symbol.
+
+**MCP Tool Call:**
+```json
+{
+  "tool": "get_stock_price", 
   "arguments": {
     "symbol": "AAPL"
   }
@@ -157,72 +244,126 @@ Configure your MCP client to connect to the deployed Function App:
 ```json
 {
   "symbol": "AAPL",
-  "price": 150.00,
-  "change": 2.50,
-  "change_percent": "+1.69%",
-  "volume": 1000000,
-  "latest_trading_day": "2024-01-01",
-  "previous_close": 147.50
+  "price": 150.25,
+  "currency": "USD",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "change": "+2.5%",
+  "status": "success"
 }
 ```
 
-#### 2. Get Stock History
-```javascript
-// Get historical data
+#### 3. Calculate Portfolio Value (`calculate_portfolio_value`)
+Calculates the total value of shares for a given stock position.
+
+**MCP Tool Call:**
+```json
 {
-  "name": "get_stock_history",
+  "tool": "calculate_portfolio_value",
   "arguments": {
     "symbol": "MSFT",
-    "period": "1mo"
+    "amount": 10
   }
 }
 ```
 
-#### 3. Calculate Technical Indicators
-```javascript
-// Calculate RSI and moving averages
+**Response:**
+```json
 {
-  "name": "calculate_technical_indicators",
-  "arguments": {
-    "symbol": "TSLA",
-    "indicators": ["rsi", "sma_20", "sma_50"],
-    "period": "3mo"
-  }
+  "symbol": "MSFT",
+  "shares": 10,
+  "price_per_share": 150.25,
+  "total_value": 1502.50,
+  "currency": "USD",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "status": "success"
 }
 ```
 
-#### 4. Get Cryptocurrency Price
-```javascript
-// Get crypto price
-{
-  "name": "get_crypto_price",
-  "arguments": {
-    "symbol": "bitcoin",
-    "vs_currency": "usd"
-  }
-}
-```
+### Direct HTTP Access
 
-#### 5. Portfolio Analysis
-```javascript
-// Analyze portfolio
-{
-  "name": "portfolio_analysis",
-  "arguments": {
-    "holdings": [
-      {"symbol": "AAPL", "quantity": 10, "type": "stock"},
-      {"symbol": "bitcoin", "quantity": 0.5, "type": "crypto"}
-    ]
-  }
-}
-```
+You can also call these functions directly via HTTP without MCP:
 
-### Health Check
-
-Test the deployment with the health endpoint:
+#### Hello Financi
 ```bash
-curl https://your-function-app.azurewebsites.net/api/health
+curl -X POST "https://financi.azurewebsites.net/api/hello_financi" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
+
+#### Get Stock Price  
+```bash
+curl -X POST "https://financi.azurewebsites.net/api/get_stock_price" \
+  -H "Content-Type: application/json" \
+  -d '{"arguments": {"symbol": "AAPL"}}'
+```
+
+#### Calculate Portfolio Value
+```bash
+curl -X POST "https://financi.azurewebsites.net/api/calculate_portfolio_value" \
+  -H "Content-Type: application/json" \
+  -d '{"arguments": {"symbol": "MSFT", "amount": 10}}'
+```
+
+### Authentication
+
+Currently, the MCP tool functions require function-level authentication. The health endpoint is publicly accessible for monitoring purposes.
+
+**Note**: The current implementation uses placeholder data for demonstration. To enable real financial data, configure the `ALPHA_VANTAGE_API_KEY` environment variable in the Azure Function App settings.
+
+### Testing Your Deployment
+
+#### Verify Function App Health
+```bash
+# Test health endpoint (no authentication required)
+curl https://financi.azurewebsites.net/api/health
+```
+
+#### Test MCP Tools
+```bash
+# Test the hello function
+curl -X POST "https://financi.azurewebsites.net/api/hello_financi" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Test stock price with authentication
+curl -X POST "https://financi.azurewebsites.net/api/get_stock_price" \
+  -H "Content-Type: application/json" \
+  -H "x-functions-key: YOUR_FUNCTION_KEY" \
+  -d '{"arguments": {"symbol": "AAPL"}}'
+```
+
+**Getting Function Keys**: 
+- Go to Azure Portal → Function App → App Keys
+- Use the default host key for testing
+- For production, create specific function keys
+
+### Troubleshooting Access Issues
+
+#### 401 Unauthorized Errors
+```bash
+# The MCP tool functions require authentication
+# Get function keys from Azure Portal:
+# Functions → App Keys → Show values → Copy default key
+
+# Use the key in requests:
+curl -H "x-functions-key: YOUR_KEY_HERE" \
+  "https://financi.azurewebsites.net/api/get_stock_price"
+```
+
+#### Function Not Found (404)
+```bash
+# Verify function names match exactly:
+# ✅ Correct: /api/hello_financi
+# ❌ Wrong:   /api/hello-financi
+
+# Check deployment status:
+az functionapp show --name financi --resource-group rg-financi --query state
+```
+
+#### Cold Start Delays
+- First request may take 10-30 seconds (cold start)
+- Subsequent requests should be fast
+- Consider Premium plan for production to eliminate cold starts
 
 ## 🧪 Testing
 
