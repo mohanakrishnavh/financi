@@ -226,13 +226,32 @@ stages:
                   exit 1
                 fi
           
-          - task: AzureFunctionApp@1
-            displayName: 'Deploy to Azure Function App'
+          - task: AzureCLI@2
+            displayName: 'Install Azure Functions Core Tools and Deploy'
             inputs:
               azureSubscription: $(azureServiceConnection)
-              appType: 'functionAppLinux'
-              appName: $(verifiedFunctionAppName)
-              package: '$(Pipeline.Workspace)/function-app/function-app.zip'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Install Azure Functions Core Tools
+                echo "Installing Azure Functions Core Tools..."
+                npm install -g azure-functions-core-tools@4 --unsafe-perm true
+                
+                # Extract the function app package
+                echo "Extracting function app package..."
+                mkdir -p /tmp/function-deploy
+                cd /tmp/function-deploy
+                unzip -q $(Pipeline.Workspace)/function-app/function-app.zip
+                
+                # List contents to verify
+                echo "Function app contents:"
+                ls -la
+                
+                # Deploy using func tools (same method that worked manually)
+                echo "Deploying to $(verifiedFunctionAppName) using func tools..."
+                func azure functionapp publish $(verifiedFunctionAppName) --python --build remote
+                
+                echo "✅ Function deployment completed"
           
           - task: AzureCLI@2
             displayName: 'Configure Function App Settings'
@@ -288,29 +307,43 @@ stages:
           
           echo "Testing health endpoint: https://$functionUrl/api/health"
           
-          # Wait for function app to be ready
-          echo "Waiting for function app to be ready..."
-          sleep 60
+          # Wait longer for function app to be ready after deployment
+          echo "Waiting for function app to fully initialize after deployment..."
+          sleep 120
           
-          # Test health endpoint with retry logic
-          max_attempts=5
+          # Test health endpoint with retry logic and better error handling
+          max_attempts=8
           attempt=1
           
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            response=$(curl -s -o /dev/null -w "%{http_code}" "https://$functionUrl/api/health" || echo "000")
+            
+            # Make health check with verbose output and longer timeout
+            response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://$functionUrl/api/health" 2>/dev/null || echo "000")
             
             if [ "$response" = "200" ]; then
               echo "✅ Health check passed on attempt $attempt"
+              # Get actual response to verify
+              health_response=$(curl -s --max-time 30 "https://$functionUrl/api/health" 2>/dev/null || echo "Failed to get response")
+              echo "Health response: $health_response"
               break
             else
               echo "❌ Health check failed with status code: $response"
+              
+              # For debugging - check if any functions are deployed
+              echo "Checking function app status..."
+              az functionapp show --name "$deployedFunctionAppName" --resource-group $(resourceGroupName) --query "{state:state,hostNames:hostNames}" || true
+              
               if [ $attempt -eq $max_attempts ]; then
                 echo "❌ Health check failed after $max_attempts attempts"
+                echo "This might be due to:"
+                echo "1. Function cold start (first deployment can take 2-3 minutes)"
+                echo "2. Function runtime initialization"
+                echo "3. Dependencies loading (yfinance, etc.)"
                 exit 1
               fi
-              echo "Retrying in 30 seconds..."
-              sleep 30
+              echo "Retrying in 45 seconds..."
+              sleep 45
             fi
             attempt=$((attempt + 1))
           done
