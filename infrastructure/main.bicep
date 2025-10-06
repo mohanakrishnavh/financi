@@ -5,7 +5,7 @@ param functionAppName string = 'financi'
 param location string = resourceGroup().location
 
 @description('The name of the storage account.')
-param storageAccountName string = 'financistorage'
+param storageAccountName string = 'financimcp${uniqueString(subscription().subscriptionId)}'
 
 @description('The name of the hosting plan.')
 param hostingPlanName string = 'financi-plan'
