@@ -41,52 +41,6 @@ tool_properties_get_stock_price_json = json.dumps([prop.to_dict() for prop in to
 tool_properties_calculate_portfolio_json = json.dumps([prop.to_dict() for prop in tool_properties_calculate_portfolio])
 
 
-def fetch_stock_price(symbol: str) -> Optional[Dict]:
-    """
-    Fetch real-time stock price using Yahoo Finance API.
-    
-    Args:
-        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
-        
-    Returns:
-        Dictionary with stock data or None if failed
-    """
-    try:
-        # Create ticker object
-        ticker = yf.Ticker(symbol)
-        
-        # Get current data
-        info = ticker.info
-        hist = ticker.history(period="1d")
-        
-        if hist.empty or not info:
-            logging.warning(f"No data found for symbol: {symbol}")
-            return None
-            
-        current_price = hist['Close'].iloc[-1]
-        previous_close = info.get('previousClose', current_price)
-        
-        # Calculate change
-        change_value = current_price - previous_close
-        change_percent = (change_value / previous_close) * 100 if previous_close != 0 else 0
-        change_str = f"{change_percent:+.2f}%"
-        
-        return {
-            "symbol": symbol.upper(),
-            "price": round(float(current_price), 2),
-            "currency": "USD",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "change": change_str,
-            "previous_close": round(float(previous_close), 2),
-            "company_name": info.get('longName', 'N/A'),
-            "status": "success"
-        }
-        
-    except Exception as e:
-        logging.error(f"Error fetching stock price for {symbol}: {str(e)}")
-        return None
-
-
 @app.generic_trigger(
     arg_name="context",
     type="mcpToolTrigger",
@@ -254,6 +208,52 @@ def calculate_portfolio_value(context) -> str:
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         return json.dumps(error_result, indent=2)
+
+
+def fetch_stock_price(symbol: str) -> Optional[Dict]:
+    """
+    Fetch real-time stock price using Yahoo Finance API.
+    
+    Args:
+        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+        
+    Returns:
+        Dictionary with stock data or None if failed
+    """
+    try:
+        # Create ticker object
+        ticker = yf.Ticker(symbol)
+        
+        # Get current data
+        info = ticker.info
+        hist = ticker.history(period="1d")
+        
+        if hist.empty or not info:
+            logging.warning(f"No data found for symbol: {symbol}")
+            return None
+            
+        current_price = hist['Close'].iloc[-1]
+        previous_close = info.get('previousClose', current_price)
+        
+        # Calculate change
+        change_value = current_price - previous_close
+        change_percent = (change_value / previous_close) * 100 if previous_close != 0 else 0
+        change_str = f"{change_percent:+.2f}%"
+        
+        return {
+            "symbol": symbol.upper(),
+            "price": round(float(current_price), 2),
+            "currency": "USD",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "change": change_str,
+            "previous_close": round(float(previous_close), 2),
+            "company_name": info.get('longName', 'N/A'),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error fetching stock price for {symbol}: {str(e)}")
+        return None
 
 
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
