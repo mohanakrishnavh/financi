@@ -138,7 +138,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
 
 // Key Vault (for storing API keys and secrets)
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: 'financi-kv-${uniqueString(resourceGroup().id)}'
+  name: 'financi-keyvault'
   location: location
   properties: {
     enabledForDeployment: false

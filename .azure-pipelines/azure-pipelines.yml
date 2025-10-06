@@ -15,11 +15,11 @@ variables:
   
   # Azure Subscription and Resource Group  
   subscriptionId: '$(AZURE_SUBSCRIPTION_ID)'
-  resourceGroupName: 'rg-financi-$(Build.SourceBranchName)'
+  resourceGroupName: 'rg-financi'
   location: 'East US 2'
   
   # Function App Configuration
-  functionAppName: 'financi-mcp-$(Build.SourceBranchName)-$(Build.BuildId)'
+  functionAppName: 'financi'
   
   # Build Configuration
   pythonVersion: '3.11'
