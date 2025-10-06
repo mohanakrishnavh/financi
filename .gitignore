@@ -175,6 +175,10 @@ function-app*.zip
 .azure-credentials
 *.credentials
 .env.local
+.function-keys
+keys.txt
+*keys*
+!get-function-keys.sh
 
 # Azure Bicep compiled files
 *.json
