@@ -62,6 +62,20 @@ graph TB
 
 ## 🛠️ Installation & Deployment
 
+### Repository Structure
+
+```
+financi/
+├── src/                    # Azure Function source code
+├── infrastructure/         # Bicep templates for Azure deployment
+├── tests/                  # Unit and integration tests
+├── docs/                   # Documentation files
+├── scripts/                # Utility scripts
+├── local-server/           # Local MCP server for development
+├── .funcignore            # Files to exclude from deployment
+└── README.md              # This file
+```
+
 ### Option 1: Automated Deployment via Azure DevOps
 
 1. **Fork this repository** to your Azure DevOps organization
@@ -102,8 +116,8 @@ az deployment group create \
 #### Step 2: Deploy Function Code
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (from project root)
+pip install -r src/requirements.txt
 
 # Create deployment package
 cd src
@@ -169,13 +183,18 @@ Add to your Claude Desktop configuration file (`~/.config/claude-desktop/claude_
     "financi": {
       "command": "node",
       "args": [
-        "/path/to/financi-mcp-client.js",
-        "https://financi.azurewebsites.net"
-      ]
+        "local-server/mcp-bridge-server.js"
+      ],
+      "env": {
+        "FINANCI_SERVER_URL": "https://financi.azurewebsites.net",
+        "FINANCI_API_KEY": "your-function-key-here"
+      }
     }
   }
 }
 ```
+
+Or copy the provided `claude-desktop-config.json` and update the API key.
 
 #### Option 2: Direct Azure Functions MCP Integration
 
@@ -370,17 +389,45 @@ az functionapp show --name financi --resource-group rg-financi --query state
 ### Local Development
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install Azure Function dependencies
+pip install -r src/requirements.txt
+
+# Install local server dependencies (for MCP bridge)
+cd local-server
+npm install
+cd ..
 
 # Run tests
 pytest tests/ -v --cov=src
 
 # Run with coverage report
 pytest tests/ --cov=src --cov-report=html
+
+# Run local MCP server for testing
+cd local-server
+node mcp-bridge-server.js
 ```
 
 ### Integration Testing
+
+#### Using Provided Test Scripts
+
+```bash
+# Get function keys from Azure (creates .env.local)
+./scripts/get-function-keys.sh
+
+# Test MCP server functionality
+./scripts/verify-mcp-server.sh
+
+# Test function endpoints
+./scripts/test-functions.sh
+
+# Run Python MCP client tests
+cd local-server
+python test-mcp-client.py
+```
+
+#### Manual Testing
 
 ```bash
 # Test health endpoint

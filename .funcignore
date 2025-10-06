@@ -1,0 +1,58 @@
+# Azure Functions ignore file
+# Exclude development and documentation files from deployment
+
+# Local development
+.env*
+.azure-credentials
+.vscode/
+*.log
+*.tmp
+
+# Documentation
+docs/
+README.md
+LICENSE
+
+# Scripts and utilities  
+scripts/
+local-server/
+
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node.js (if any local server files remain)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+tests/
+pytest.ini
+.coverage
+.pytest_cache/
+
+# Infrastructure (deployment configs only)
+infrastructure/
+.azure-pipelines/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

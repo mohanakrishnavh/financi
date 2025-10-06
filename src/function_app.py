@@ -1,8 +1,11 @@
 import json
 import logging
 from datetime import datetime
+from typing import Dict, Optional
 
 import azure.functions as func
+import yfinance as yf
+import requests
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
@@ -36,6 +39,52 @@ tool_properties_calculate_portfolio = [
 # Convert tool properties to JSON
 tool_properties_get_stock_price_json = json.dumps([prop.to_dict() for prop in tool_properties_get_stock_price])
 tool_properties_calculate_portfolio_json = json.dumps([prop.to_dict() for prop in tool_properties_calculate_portfolio])
+
+
+def fetch_stock_price(symbol: str) -> Optional[Dict]:
+    """
+    Fetch real-time stock price using Yahoo Finance API.
+    
+    Args:
+        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+        
+    Returns:
+        Dictionary with stock data or None if failed
+    """
+    try:
+        # Create ticker object
+        ticker = yf.Ticker(symbol)
+        
+        # Get current data
+        info = ticker.info
+        hist = ticker.history(period="1d")
+        
+        if hist.empty or not info:
+            logging.warning(f"No data found for symbol: {symbol}")
+            return None
+            
+        current_price = hist['Close'].iloc[-1]
+        previous_close = info.get('previousClose', current_price)
+        
+        # Calculate change
+        change_value = current_price - previous_close
+        change_percent = (change_value / previous_close) * 100 if previous_close != 0 else 0
+        change_str = f"{change_percent:+.2f}%"
+        
+        return {
+            "symbol": symbol.upper(),
+            "price": round(float(current_price), 2),
+            "currency": "USD",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "change": change_str,
+            "previous_close": round(float(previous_close), 2),
+            "company_name": info.get('longName', 'N/A'),
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error fetching stock price for {symbol}: {str(e)}")
+        return None
 
 
 @app.generic_trigger(
@@ -80,26 +129,45 @@ def get_stock_price(context) -> str:
         content = json.loads(context)
         symbol = content["arguments"][_SYMBOL_PROPERTY_NAME]
         
-        if not symbol:
-            return "No stock symbol provided"
+        if not symbol or not symbol.strip():
+            error_result = {
+                "error": "No stock symbol provided",
+                "status": "error",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            return json.dumps(error_result, indent=2)
         
-        # TODO: Implement real stock price API integration (e.g., Alpha Vantage, Yahoo Finance)
-        # For now, return placeholder data
-        result = {
-            "symbol": symbol.upper(),
-            "price": 150.25,  # Placeholder price
-            "currency": "USD",
-            "timestamp": datetime.utcnow().isoformat(),
-            "change": "+2.5%",
-            "status": "success"
+        # Fetch real stock price
+        stock_data = fetch_stock_price(symbol.strip())
+        
+        if stock_data is None:
+            error_result = {
+                "error": f"Unable to fetch stock data for symbol: {symbol.upper()}",
+                "symbol": symbol.upper(),
+                "status": "error", 
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            return json.dumps(error_result, indent=2)
+        
+        logging.info(f"Retrieved stock price for {symbol}: ${stock_data['price']}")
+        return json.dumps(stock_data, indent=2)
+        
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error in get_stock_price: {str(e)}")
+        error_result = {
+            "error": "Invalid request format",
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
         }
-        
-        logging.info(f"Retrieved stock price for {symbol}: ${result['price']}")
-        return json.dumps(result, indent=2)
-        
+        return json.dumps(error_result, indent=2)
     except Exception as e:
-        logging.error(f"Error getting stock price: {str(e)}")
-        return f"Error retrieving stock price: {str(e)}"
+        logging.error(f"Unexpected error in get_stock_price: {str(e)}")
+        error_result = {
+            "error": f"Unexpected error: {str(e)}",
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        return json.dumps(error_result, indent=2)
 
 
 @app.generic_trigger(
@@ -124,16 +192,36 @@ def calculate_portfolio_value(context) -> str:
         symbol = content["arguments"][_SYMBOL_PROPERTY_NAME]
         amount = content["arguments"][_AMOUNT_PROPERTY_NAME]
         
-        if not symbol:
-            return "No stock symbol provided"
+        if not symbol or not symbol.strip():
+            error_result = {
+                "error": "No stock symbol provided",
+                "status": "error",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            return json.dumps(error_result, indent=2)
         
         if not amount or amount <= 0:
-            return "Invalid share amount provided"
+            error_result = {
+                "error": "Invalid share amount provided. Must be a positive number.",
+                "status": "error",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            return json.dumps(error_result, indent=2)
         
-        # TODO: Use real stock price from API
-        # For now, use placeholder price
-        price_per_share = 150.25  # Placeholder
-        total_value = price_per_share * amount
+        # Fetch real stock price
+        stock_data = fetch_stock_price(symbol.strip())
+        
+        if stock_data is None:
+            error_result = {
+                "error": f"Unable to fetch stock data for symbol: {symbol.upper()}",
+                "symbol": symbol.upper(),
+                "status": "error",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            return json.dumps(error_result, indent=2)
+        
+        price_per_share = stock_data["price"]
+        total_value = round(price_per_share * amount, 2)
         
         result = {
             "symbol": symbol.upper(),
@@ -141,16 +229,31 @@ def calculate_portfolio_value(context) -> str:
             "price_per_share": price_per_share,
             "total_value": total_value,
             "currency": "USD",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "company_name": stock_data.get("company_name", "N/A"),
+            "current_change": stock_data.get("change", "N/A"),
             "status": "success"
         }
         
         logging.info(f"Calculated portfolio value for {amount} shares of {symbol}: ${total_value}")
         return json.dumps(result, indent=2)
         
+    except json.JSONDecodeError as e:
+        logging.error(f"JSON decode error in calculate_portfolio_value: {str(e)}")
+        error_result = {
+            "error": "Invalid request format",
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        return json.dumps(error_result, indent=2)
     except Exception as e:
-        logging.error(f"Error calculating portfolio value: {str(e)}")
-        return f"Error calculating portfolio value: {str(e)}"
+        logging.error(f"Unexpected error in calculate_portfolio_value: {str(e)}")
+        error_result = {
+            "error": f"Unexpected error: {str(e)}",
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        return json.dumps(error_result, indent=2)
 
 
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)

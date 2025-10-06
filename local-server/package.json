@@ -1,0 +1,15 @@
+{
+  "name": "financi-mcp-bridge",
+  "version": "1.0.0",
+  "description": "MCP Bridge Server for Financi Azure Functions",
+  "main": "mcp-bridge-server.js",
+  "scripts": {
+    "start": "node mcp-bridge-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "keywords": ["mcp", "azure", "functions", "financi"],
+  "author": "Mohanakrishna",
+  "license": "MIT"
+}
