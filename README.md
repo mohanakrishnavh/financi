@@ -386,6 +386,33 @@ az functionapp show --name financi --resource-group rg-financi --query state
 
 ## 🧪 Testing
 
+### Test Organization
+
+The test suite is organized by handler modules, mirroring the code structure:
+
+```
+tests/
+├── test_new_functions.py          # Master test runner (interactive)
+├── test_stock_handlers.py         # Stock-related function tests
+├── test_financial_calculators.py  # Financial calculator tests
+├── test_integration.py            # Integration & real-world scenarios
+├── test_mcp_server.py            # Original MCP server tests
+└── __init__.py
+```
+
+**Quick Start:**
+```bash
+# Interactive test runner (recommended)
+python tests/test_new_functions.py
+
+# Run specific test modules
+python tests/test_stock_handlers.py
+python tests/test_financial_calculators.py
+python tests/test_integration.py
+```
+
+See [docs/TEST_ORGANIZATION.md](docs/TEST_ORGANIZATION.md) for detailed test documentation.
+
 ### Local Development
 
 ```bash
@@ -397,7 +424,13 @@ cd local-server
 npm install
 cd ..
 
-# Run tests
+# Run all tests interactively
+python tests/test_new_functions.py
+
+# Run specific test module
+python tests/test_stock_handlers.py
+
+# Run legacy pytest tests
 pytest tests/ -v --cov=src
 
 # Run with coverage report
