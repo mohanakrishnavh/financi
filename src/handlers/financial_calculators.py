@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import datetime
 
-from ..models.tool_properties import (
+from models.tool_properties import (
     PRINCIPAL_PROPERTY,
     RATE_PROPERTY,
     TIME_PROPERTY,

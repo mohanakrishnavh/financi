@@ -7,8 +7,8 @@ import json
 import logging
 from datetime import datetime
 
-from ..models.tool_properties import SYMBOL_PROPERTY, AMOUNT_PROPERTY
-from ..utils.stock_utils import fetch_stock_price, perform_eight_pillar_analysis
+from models.tool_properties import SYMBOL_PROPERTY, AMOUNT_PROPERTY
+from utils.stock_utils import fetch_stock_price, perform_eight_pillar_analysis
 
 
 def handle_get_stock_price(context: str) -> str:
