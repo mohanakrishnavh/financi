@@ -7,7 +7,6 @@ Each endpoint wraps an existing handler function and provides RESTful access.
 
 import json
 import logging
-from types import SimpleNamespace
 import azure.functions as func
 
 # Import existing handlers
@@ -57,11 +56,16 @@ def create_http_wrappers(app: func.FunctionApp):
                     status_code=400
                 )
             
-            # Create context object
-            context = SimpleNamespace(symbol=symbol)
+            # Create context in the format expected by the handler (JSON string)
+            context_data = {
+                "arguments": {
+                    "symbol": symbol
+                }
+            }
+            context_json = json.dumps(context_data)
             
             # Call existing handler
-            result = handle_get_stock_price(context)
+            result = handle_get_stock_price(context_json)
             
             return func.HttpResponse(
                 result,
@@ -120,11 +124,17 @@ def create_http_wrappers(app: func.FunctionApp):
                     status_code=400
                 )
             
-            # Create context object
-            context = SimpleNamespace(symbol=symbol, amount=amount)
+            # Create context in the format expected by the handler (JSON string)
+            context_data = {
+                "arguments": {
+                    "symbol": symbol,
+                    "amount": amount
+                }
+            }
+            context_json = json.dumps(context_data)
             
             # Call existing handler
-            result = handle_calculate_portfolio_value(context)
+            result = handle_calculate_portfolio_value(context_json)
             
             return func.HttpResponse(
                 result,
@@ -166,11 +176,16 @@ def create_http_wrappers(app: func.FunctionApp):
                     status_code=400
                 )
             
-            # Create context object
-            context = SimpleNamespace(symbol=symbol)
+            # Create context in the format expected by the handler (JSON string)
+            context_data = {
+                "arguments": {
+                    "symbol": symbol
+                }
+            }
+            context_json = json.dumps(context_data)
             
             # Call existing handler
-            result = handle_eight_pillar_stock_analysis(context)
+            result = handle_eight_pillar_stock_analysis(context_json)
             
             return func.HttpResponse(
                 result,
@@ -213,9 +228,9 @@ def create_http_wrappers(app: func.FunctionApp):
             frequency = req.params.get('frequency') or req_body.get('frequency')
             
             # Validate required parameters
-            if not all([principal_str, rate_str, time_str, frequency]):
+            if not all([principal_str, rate_str, time_str]):
                 return func.HttpResponse(
-                    json.dumps({"error": "Missing required parameters. Required: principal, rate, time, frequency"}),
+                    json.dumps({"error": "Missing required parameters. Required: principal, rate, time"}),
                     mimetype="application/json",
                     status_code=400
                 )
@@ -225,32 +240,36 @@ def create_http_wrappers(app: func.FunctionApp):
                 principal = float(principal_str)
                 rate = float(rate_str)
                 time = float(time_str)
+                # Frequency defaults to 12 (monthly) if not provided
+                frequency = int(frequency) if frequency else 12
             except ValueError:
                 return func.HttpResponse(
-                    json.dumps({"error": "Invalid numeric values for principal, rate, or time"}),
+                    json.dumps({"error": "Invalid numeric values"}),
                     mimetype="application/json",
                     status_code=400
                 )
             
             # Validate frequency
-            valid_frequencies = ['annually', 'semi-annually', 'quarterly', 'monthly', 'daily']
-            if frequency not in valid_frequencies:
+            if frequency not in [1, 2, 4, 12, 365]:
                 return func.HttpResponse(
-                    json.dumps({"error": f"Invalid frequency. Must be one of: {', '.join(valid_frequencies)}"}),
+                    json.dumps({"error": "Invalid frequency. Must be 1 (annual), 2 (semi-annual), 4 (quarterly), 12 (monthly), or 365 (daily)"}),
                     mimetype="application/json",
                     status_code=400
                 )
             
-            # Create context object
-            context = SimpleNamespace(
-                principal=principal,
-                rate=rate,
-                time=time,
-                frequency=frequency
-            )
+            # Create context in the format expected by the handler (JSON string)
+            context_data = {
+                "arguments": {
+                    "principal": principal,
+                    "rate": rate,
+                    "time": time,
+                    "frequency": frequency
+                }
+            }
+            context_json = json.dumps(context_data)
             
             # Call existing handler
-            result = handle_compound_interest_calculator(context)
+            result = handle_compound_interest_calculator(context_json)
             
             return func.HttpResponse(
                 result,
@@ -324,17 +343,20 @@ def create_http_wrappers(app: func.FunctionApp):
                     status_code=400
                 )
             
-            # Create context object
-            context = SimpleNamespace(
-                current_age=current_age,
-                retirement_age=retirement_age,
-                current_savings=current_savings,
-                monthly_contribution=monthly_contribution,
-                annual_return=annual_return
-            )
+            # Create context in the format expected by the handler (JSON string)
+            context_data = {
+                "arguments": {
+                    "current_age": current_age,
+                    "retirement_age": retirement_age,
+                    "current_savings": current_savings,
+                    "monthly_contribution": monthly_contribution,
+                    "annual_return": annual_return
+                }
+            }
+            context_json = json.dumps(context_data)
             
             # Call existing handler
-            result = handle_retirement_calculator(context)
+            result = handle_retirement_calculator(context_json)
             
             return func.HttpResponse(
                 result,
