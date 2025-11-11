@@ -181,8 +181,9 @@ class TestHealthEndpoint:
         assert response_data["status"] == "healthy"
         assert "timestamp" in response_data
         assert response_data["service"] == "financi-mcp"
-        assert response_data["version"] == "1.0.0"
-        assert "mcp_endpoint" in response_data
+        assert response_data["version"] == "1.2.0"  # Updated to 1.2.0
+        assert "http_endpoints" in response_data  # Now includes HTTP endpoints
+        assert "tools" in response_data
     
     def test_health_endpoint_content_type(self):
         """Test health endpoint returns correct content type."""
@@ -197,35 +198,38 @@ class TestHealthEndpoint:
 class TestToolProperties:
     """Test tool properties and configuration."""
     
-    def test_tool_properties_import(self):
-        """Test that tool properties can be imported."""
-        from function_app import (
-            tool_properties_get_stock_price,
-            tool_properties_calculate_portfolio,
-            ToolProperty
+    def test_tool_properties_from_models(self):
+        """Test that tool properties can be imported from models."""
+        from models.tool_properties import (
+            STOCK_PRICE_JSON,
+            PORTFOLIO_JSON,
+            EIGHT_PILLAR_JSON,
+            COMPOUND_INTEREST_JSON,
+            RETIREMENT_CALCULATOR_JSON
         )
         
-        # Verify tool properties exist
-        assert tool_properties_get_stock_price is not None
-        assert tool_properties_calculate_portfolio is not None
-        assert len(tool_properties_get_stock_price) > 0
-        assert len(tool_properties_calculate_portfolio) > 0
+        # Verify tool properties exist and are valid JSON strings
+        assert STOCK_PRICE_JSON is not None
+        assert PORTFOLIO_JSON is not None
+        assert EIGHT_PILLAR_JSON is not None
+        assert COMPOUND_INTEREST_JSON is not None
+        assert RETIREMENT_CALCULATOR_JSON is not None
+        
+        # Verify they can be parsed as JSON
+        import json
+        assert isinstance(json.loads(STOCK_PRICE_JSON), list)
+        assert isinstance(json.loads(PORTFOLIO_JSON), list)
+        assert isinstance(json.loads(EIGHT_PILLAR_JSON), list)
+        assert isinstance(json.loads(COMPOUND_INTEREST_JSON), list)
+        assert isinstance(json.loads(RETIREMENT_CALCULATOR_JSON), list)
     
-    def test_tool_property_structure(self):
-        """Test ToolProperty class structure."""
-        from function_app import ToolProperty
+    def test_http_wrappers_integration(self):
+        """Test that HTTP wrappers are properly integrated."""
+        # Simply verify the module can be imported
+        from http_wrappers import create_http_wrappers
         
-        prop = ToolProperty("test_name", "string", "Test description")
-        
-        assert prop.propertyName == "test_name"
-        assert prop.propertyType == "string"
-        assert prop.description == "Test description"
-        
-        # Test to_dict method
-        prop_dict = prop.to_dict()
-        assert prop_dict["propertyName"] == "test_name"
-        assert prop_dict["propertyType"] == "string"
-        assert prop_dict["description"] == "Test description"
+        # Verify it's a callable function
+        assert callable(create_http_wrappers)
 
 # Integration tests
 class TestIntegration:
