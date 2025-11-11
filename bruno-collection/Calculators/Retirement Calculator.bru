@@ -20,8 +20,7 @@ body:json {
     "retirement_age": 65,
     "current_savings": 50000,
     "monthly_contribution": 1000,
-    "annual_return": 7,
-    "inflation_rate": 2.5
+    "annual_return": 7
   }
 }
 
@@ -39,15 +38,15 @@ docs {
   - current_savings (required): Current retirement savings (must be >= 0)
   - monthly_contribution (required): Monthly savings amount (must be >= 0)
   - annual_return (required): Expected annual return rate as percentage (e.g., 7 for 7%)
-  - inflation_rate (optional): Expected inflation rate as percentage (default: 2.5)
   
   Returns:
   - years_to_retirement: Number of years until retirement
+  - projected_retirement_balance: Final retirement balance
   - total_contributions: Total amount you'll contribute
-  - nominal_value: Final value without inflation adjustment
-  - real_value: Inflation-adjusted final value (purchasing power)
-  - inflation_impact: Amount lost to inflation
-  - monthly_income_at_retirement: Estimated monthly income in retirement
+  - total_interest_earned: Total interest/returns earned
+  - estimated_monthly_withdrawal_4percent_rule: Safe monthly withdrawal amount
+  - estimated_annual_withdrawal_4percent_rule: Safe annual withdrawal amount
+  - yearly_breakdown: Year-by-year projection details
   
   Example scenarios:
   - 30-year-old with $50k, saving $1k/month until 65

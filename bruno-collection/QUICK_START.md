@@ -69,16 +69,16 @@ This verifies the API is running:
    ```json
    {
      "symbol": "AAPL",
-     "shares": 100
+     "amount": 100
    }
    ```
 3. Click **"Send"**
 4. ✅ You'll see the total value of 100 Apple shares
 
 **Try different scenarios**:
-- Change `"shares": 100` to `"shares": 50`
+- Change `"amount": 100` to `"amount": 50`
 - Change `"symbol": "AAPL"` to `"symbol": "MSFT"`
-- Try: `{"symbol": "GOOGL", "shares": 25}`
+- Try: `{"symbol": "GOOGL", "amount": 25}`
 
 ---
 
@@ -144,15 +144,15 @@ This verifies the API is running:
      "retirement_age": 65,
      "current_savings": 50000,
      "monthly_contribution": 1000,
-     "annual_return": 7,
-     "inflation_rate": 2.5
+     "annual_return": 7
    }
    ```
 3. Click **"Send"**
 4. ✅ You'll see:
-   - Total at retirement (nominal and inflation-adjusted)
-   - Monthly income in retirement
-   - Inflation impact
+   - Projected retirement balance
+   - Total contributions and interest earned
+   - Safe withdrawal amounts (4% rule)
+   - Year-by-year breakdown
 
 **Try different scenarios**:
 - Starting younger: `{"current_age": 25, "retirement_age": 60, ...}`

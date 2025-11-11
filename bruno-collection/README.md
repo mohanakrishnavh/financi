@@ -18,23 +18,24 @@ Bruno is a fast, Git-friendly, open-source API client alternative to Postman. It
    - Navigate to this `bruno-collection` directory
    - Select the folder
 
-## Configuration
+### Configuration
 
 ### Set Your Function Key
 
-Before using the API, you need to set your Azure Function key:
+Before using the Production API, you need to configure your Azure Function key:
 
-1. Get your function key:
+1. **Get your function key**:
    ```bash
-   cd /Users/mohanakrishnavh/Repos/financi
-   ./scripts/get-function-keys.sh
+   az functionapp keys list --name financi --resource-group rg-financi --query "functionKeys.default" -o tsv
    ```
 
-2. In Bruno:
-   - Click on "Environments" in the sidebar
+2. **Update the Production environment in Bruno**:
+   - Click on "Environments" (folder icon) in the left sidebar
    - Select "Production" environment
    - Replace `your-function-key-here` with your actual function key
-   - Save the environment
+   - Click "Save" (or Cmd+S)
+
+**Security Note**: Do NOT commit your actual function key to Git. The Production.bru file uses a placeholder for security.
 
 ### Environments
 
@@ -65,8 +66,8 @@ Switch between environments using the dropdown in Bruno's top bar.
 - **Method**: POST
 - **URL**: `/api/stock/portfolio`
 - **Auth**: Function key required
-- **Body**: `{ "symbol": "AAPL", "shares": 100 }`
-- **Purpose**: Calculate total value of stock holdings
+- **Body**: `{ "symbol": "AAPL", "amount": 100 }`
+- **Purpose**: Calculate total value of stock holdings (amount = number of shares)
 
 #### Eight Pillar Stock Analysis
 - **Method**: GET
@@ -102,11 +103,10 @@ Switch between environments using the dropdown in Bruno's top bar.
     "retirement_age": 65,
     "current_savings": 50000,
     "monthly_contribution": 1000,
-    "annual_return": 7,
-    "inflation_rate": 2.5
+    "annual_return": 7
   }
   ```
-- **Purpose**: Calculate retirement savings projections
+- **Purpose**: Calculate retirement savings projections with year-by-year breakdown
 
 ## Quick Start
 
