@@ -9,9 +9,6 @@ from datetime import datetime
 
 import azure.functions as func
 
-# Version
-MCP_SERVER_VERSION = "1.4.0"
-
 # Import tool properties
 from models.tool_properties import (
     STOCK_PRICE_JSON,
@@ -161,7 +158,7 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "service": "financi-mcp",
-            "version": MCP_SERVER_VERSION,
+            "version": "1.4.0",
             "mcp_endpoint": "/runtime/webhooks/mcp/sse",
             "http_endpoints": {
                 "stock_price": "/api/stock/price",
