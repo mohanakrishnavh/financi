@@ -25,11 +25,18 @@ def update_function_app_version(version):
     """Update version in function_app.py."""
     content = FUNCTION_APP.read_text()
     
-    # Pattern to match: "version": "X.Y.Z"
-    pattern = r'"version":\s*"[0-9]+\.[0-9]+\.[0-9]+"'
-    replacement = f'"version": "{version}"'
+    # Pattern 1: MCP_SERVER_VERSION constant
+    pattern1 = r'MCP_SERVER_VERSION\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+"'
+    replacement1 = f'MCP_SERVER_VERSION = "{version}"'
+    updated_content = re.sub(pattern1, replacement1, content)
     
-    updated_content = re.sub(pattern, replacement, content)
+    # Pattern 2: "version": "X.Y.Z" in health endpoint
+    pattern2 = r'"version":\s*"[0-9]+\.[0-9]+\.[0-9]+"'
+    replacement2 = f'"version": "{version}"'
+    updated_content = re.sub(pattern2, replacement2, updated_content)
+    
+    # Pattern 3: version: MCP_SERVER_VERSION (in case it references the constant)
+    # No need to update if it uses the constant
     
     if content != updated_content:
         FUNCTION_APP.write_text(updated_content)
@@ -109,14 +116,31 @@ def show_version():
     # Also check function_app.py
     if FUNCTION_APP.exists():
         content = FUNCTION_APP.read_text()
-        match = re.search(r'"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"', content)
-        if match:
-            app_version = match.group(1)
-            if app_version == version:
-                print(f"✅ function_app.py: {app_version} (synced)")
+        
+        # Check MCP_SERVER_VERSION constant
+        match_constant = re.search(r'MCP_SERVER_VERSION\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', content)
+        match_health = re.search(r'"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"', content)
+        
+        all_synced = True
+        
+        if match_constant:
+            const_version = match_constant.group(1)
+            if const_version == version:
+                print(f"✅ MCP_SERVER_VERSION: {const_version} (synced)")
             else:
-                print(f"⚠️  function_app.py: {app_version} (out of sync!)")
-                print(f"   Run: python scripts/version.py sync")
+                print(f"⚠️  MCP_SERVER_VERSION: {const_version} (out of sync!)")
+                all_synced = False
+        
+        if match_health:
+            health_version = match_health.group(1)
+            if health_version == version:
+                print(f"✅ health endpoint version: {health_version} (synced)")
+            else:
+                print(f"⚠️  health endpoint version: {health_version} (out of sync!)")
+                all_synced = False
+        
+        if not all_synced:
+            print(f"\n   Run: python scripts/version.py sync")
 
 
 def sync_versions():
