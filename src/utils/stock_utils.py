@@ -1,30 +1,67 @@
 """
 Stock-related utility functions.
-Handles fetching stock data and performing financial analysis.
+Handles fetching stock data and performing financial analysis using multiple data sources.
 """
 
 import logging
+import yfinance as yf
 from datetime import datetime
 from typing import Dict, Optional
 
-import yfinance as yf
+# Import the unified stock data service
+try:
+    from services.stock_data_service import get_stock_data_service
+    USE_UNIFIED_SERVICE = True
+except ImportError:
+    # Fallback to direct yfinance if service not available
+    USE_UNIFIED_SERVICE = False
+    logging.warning("StockDataService not available, using direct yfinance")
 
 
 def fetch_stock_price(symbol: str) -> Optional[Dict]:
     """
-    Fetch real-time stock price using Yahoo Finance API.
+    Fetch real-time stock price using configured data source (Alpha Vantage or Yahoo Finance).
     
     Args:
-        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+        symbol: Stock symbol (e.g., 'AAPL', 'MSFT', 'RELIANCE.NS')
         
     Returns:
         Dictionary with stock data or None if failed
     """
     try:
-        # Create ticker object
-        ticker = yf.Ticker(symbol)
+        if USE_UNIFIED_SERVICE:
+            # Use unified service with Alpha Vantage/Yahoo Finance support
+            service = get_stock_data_service()
+            stock_data = service.get_stock_quote(symbol)
+            return stock_data
+        else:
+            # Fallback to direct yfinance
+            return _fetch_stock_price_yfinance(symbol)
+            
+    except Exception as e:
+        logging.error(f"Error fetching stock price for {symbol}: {str(e)}")
+        # Try fallback to yfinance if unified service fails
+        if USE_UNIFIED_SERVICE:
+            logging.info(f"Attempting direct yfinance fallback for {symbol}")
+            try:
+                return _fetch_stock_price_yfinance(symbol)
+            except Exception as fallback_error:
+                logging.error(f"Fallback also failed: {str(fallback_error)}")
+        return None
+
+
+def _fetch_stock_price_yfinance(symbol: str) -> Optional[Dict]:
+    """
+    Direct Yahoo Finance implementation (fallback).
+    
+    Args:
+        symbol: Stock symbol
         
-        # Get current data
+    Returns:
+        Dictionary with stock data or None if failed
+    """
+    try:
+        ticker = yf.Ticker(symbol)
         info = ticker.info
         hist = ticker.history(period="1d")
         
@@ -35,7 +72,6 @@ def fetch_stock_price(symbol: str) -> Optional[Dict]:
         current_price = hist['Close'].iloc[-1]
         previous_close = info.get('previousClose', current_price)
         
-        # Calculate change
         change_value = current_price - previous_close
         change_percent = (change_value / previous_close) * 100 if previous_close != 0 else 0
         change_str = f"{change_percent:+.2f}%"
@@ -48,361 +84,225 @@ def fetch_stock_price(symbol: str) -> Optional[Dict]:
             "change": change_str,
             "previous_close": round(float(previous_close), 2),
             "company_name": info.get('longName', 'N/A'),
+            "data_source": "yahoo_finance",
             "status": "success"
         }
         
     except Exception as e:
-        logging.error(f"Error fetching stock price for {symbol}: {str(e)}")
+        logging.error(f"Error in _fetch_stock_price_yfinance for {symbol}: {str(e)}")
         return None
 
 
 def perform_eight_pillar_analysis(symbol: str) -> Optional[Dict]:
     """
-    Perform comprehensive Eight Pillar Stock Analysis.
+    Perform Eight Pillar Stock Analysis using yfinance.
     
-    The Eight Pillars evaluate:
-    1. Five-Year PE Ratio (< 22.5)
-    2. Five-Year ROIC (Return on Invested Capital)
-    3. Shares Outstanding (decreasing preferred)
-    4. Cash Flow Growth (5-year trend)
-    5. Net Income Growth (5-year trend)
-    6. Revenue Growth (5-year trend)
-    7. Long-Term Liabilities (< 5x FCF)
-    8. Price-to-Free Cash Flow (< 22.5)
+    This function uses Yahoo Finance for comprehensive financial data.
+    Alpha Vantage integration for Eight Pillar analysis can be added in future versions.
     
     Args:
         symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
         
     Returns:
-        Dictionary with detailed eight pillar analysis or None if failed
+        Dictionary with analysis results or None if failed
     """
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
         
         # Get financial statements
-        try:
-            financials = ticker.financials
-            balance_sheet = ticker.balance_sheet
-            cashflow = ticker.cashflow
-        except Exception as e:
-            logging.error(f"Error fetching financial statements for {symbol}: {str(e)}")
+        balance_sheet = ticker.balance_sheet
+        income_stmt = ticker.income_stmt
+        cash_flow = ticker.cashflow
+        
+        if balance_sheet.empty or income_stmt.empty or cash_flow.empty:
+            logging.warning(f"Insufficient financial data for {symbol}")
             return None
         
-        if financials.empty or balance_sheet.empty or cashflow.empty:
-            logging.warning(f"Incomplete financial data for {symbol}")
-            return None
+        # Pillar 1: PE Ratio
+        pe_ratio = info.get('trailingPE', 0)
+        pe_check = "✓" if pe_ratio < 22.5 else "✗"
         
-        # Get current market cap
-        market_cap = info.get('marketCap', 0)
-        company_name = info.get('longName', symbol.upper())
-        
-        pillars = {}
-        checks_passed = 0
-        
-        # PILLAR 1: Five-Year PE Ratio (< 22.5)
+        # Pillar 2: ROIC (Return on Invested Capital)
         try:
-            net_incomes = financials.loc['Net Income'].head(5) if 'Net Income' in financials.index else None
-            if net_incomes is not None and len(net_incomes) >= 1:
-                total_5yr_earnings = net_incomes.sum()
-                five_year_pe = market_cap / total_5yr_earnings if total_5yr_earnings > 0 else None
-                
-                if five_year_pe is not None:
-                    check_passed = five_year_pe < 22.5
-                    checks_passed += 1 if check_passed else 0
-                    pillars['pillar_1_five_year_pe_ratio'] = {
-                        "value": round(five_year_pe, 2),
-                        "threshold": "< 22.5",
-                        "check": "✓" if check_passed else "✗",
-                        "description": "Five-year PE ratio measures valuation efficiency",
-                        "interpretation": "Good value" if check_passed else "Potentially overvalued"
-                    }
-                else:
-                    pillars['pillar_1_five_year_pe_ratio'] = {
-                        "value": "N/A",
-                        "threshold": "< 22.5",
-                        "check": "?",
-                        "description": "Insufficient data for calculation"
-                    }
-            else:
-                pillars['pillar_1_five_year_pe_ratio'] = {
-                    "value": "N/A",
-                    "threshold": "< 22.5", 
-                    "check": "?",
-                    "description": "Net income data not available"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 1 for {symbol}: {str(e)}")
-            pillars['pillar_1_five_year_pe_ratio'] = {"value": "Error", "check": "?", "error": str(e)}
-        
-        # PILLAR 2: Five-Year ROIC (Return on Invested Capital)
-        try:
-            free_cashflows = cashflow.loc['Free Cash Flow'].head(5) if 'Free Cash Flow' in cashflow.index else None
-            total_equity = balance_sheet.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in balance_sheet.index else 0
-            total_debt = balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in balance_sheet.index else 0
+            total_assets = balance_sheet.loc['Total Assets'].iloc[0] if 'Total Assets' in balance_sheet.index else 0
+            total_liabilities = balance_sheet.loc['Total Liabilities Net Minority Interest'].iloc[0] if 'Total Liabilities Net Minority Interest' in balance_sheet.index else 0
+            invested_capital = total_assets - total_liabilities if total_assets and total_liabilities else 0
             
-            if free_cashflows is not None and len(free_cashflows) >= 1:
-                total_5yr_fcf = free_cashflows.sum()
-                invested_capital = total_equity + total_debt
-                
-                if invested_capital > 0:
-                    roic = (total_5yr_fcf / invested_capital) * 100
-                    check_passed = roic > 10  # Good ROIC threshold
-                    checks_passed += 1 if check_passed else 0
-                    pillars['pillar_2_five_year_roic'] = {
-                        "value": f"{round(roic, 2)}%",
-                        "threshold": "> 10% (good)",
-                        "check": "✓" if check_passed else "✗",
-                        "description": "Return on Invested Capital measures capital efficiency",
-                        "interpretation": "Strong capital efficiency" if check_passed else "Weak capital efficiency"
-                    }
-                else:
-                    pillars['pillar_2_five_year_roic'] = {
-                        "value": "N/A",
-                        "threshold": "> 10%",
-                        "check": "?",
-                        "description": "Insufficient capital data"
-                    }
-            else:
-                pillars['pillar_2_five_year_roic'] = {
-                    "value": "N/A",
-                    "threshold": "> 10%",
-                    "check": "?",
-                    "description": "Free cash flow data not available"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 2 for {symbol}: {str(e)}")
-            pillars['pillar_2_five_year_roic'] = {"value": "Error", "check": "?", "error": str(e)}
+            net_income = income_stmt.loc['Net Income'].iloc[0] if 'Net Income' in income_stmt.index else 0
+            roic = (net_income / invested_capital * 100) if invested_capital > 0 else 0
+            roic_check = "✓" if roic > 10 else "✗"
+        except:
+            roic = 0
+            roic_check = "✗"
         
-        # PILLAR 3: Shares Outstanding (decreasing is better)
+        # Pillar 3: Shares Outstanding
         try:
-            shares_outstanding = balance_sheet.loc['Ordinary Shares Number'] if 'Ordinary Shares Number' in balance_sheet.index else None
-            
-            if shares_outstanding is not None and len(shares_outstanding) >= 2:
-                current_shares = shares_outstanding.iloc[0]
-                old_shares = shares_outstanding.iloc[-1] if len(shares_outstanding) >= 5 else shares_outstanding.iloc[-1]
-                
-                change_pct = ((current_shares - old_shares) / old_shares) * 100
-                check_passed = current_shares < old_shares
-                checks_passed += 1 if check_passed else 0
-                
-                pillars['pillar_3_shares_outstanding'] = {
-                    "current_shares": f"{current_shares:,.0f}",
-                    "change_percent": f"{change_pct:+.2f}%",
-                    "threshold": "Decreasing",
-                    "check": "✓" if check_passed else "✗",
-                    "description": "Share buybacks indicate management confidence",
-                    "interpretation": "Shareholder-friendly buybacks" if check_passed else "Dilution occurring"
-                }
-            else:
-                pillars['pillar_3_shares_outstanding'] = {
-                    "value": "N/A",
-                    "threshold": "Decreasing",
-                    "check": "?",
-                    "description": "Insufficient shares data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 3 for {symbol}: {str(e)}")
-            pillars['pillar_3_shares_outstanding'] = {"value": "Error", "check": "?", "error": str(e)}
+            shares_outstanding = info.get('sharesOutstanding', 0)
+            shares_check = "?" if shares_outstanding == 0 else "✓"
+        except:
+            shares_outstanding = 0
+            shares_check = "✗"
         
-        # PILLAR 4: Cash Flow Growth (Last 5 Years)
+        # Pillar 4: Cash Flow Growth
         try:
-            free_cashflows = cashflow.loc['Free Cash Flow'].head(5) if 'Free Cash Flow' in cashflow.index else None
-            
-            if free_cashflows is not None and len(free_cashflows) >= 2:
-                latest_fcf = free_cashflows.iloc[0]
-                oldest_fcf = free_cashflows.iloc[-1]
-                
-                check_passed = latest_fcf > oldest_fcf
-                growth_pct = ((latest_fcf - oldest_fcf) / abs(oldest_fcf)) * 100 if oldest_fcf != 0 else 0
-                checks_passed += 1 if check_passed else 0
-                
-                pillars['pillar_4_cash_flow_growth'] = {
-                    "latest_fcf": f"${latest_fcf:,.0f}",
-                    "growth_percent": f"{growth_pct:+.2f}%",
-                    "threshold": "Positive growth",
-                    "check": "✓" if check_passed else "✗",
-                    "description": "Cash flow growth indicates financial health",
-                    "interpretation": "Growing cash generation" if check_passed else "Declining cash generation"
-                }
+            if 'Operating Cash Flow' in cash_flow.index and len(cash_flow.columns) >= 2:
+                latest_cf = cash_flow.loc['Operating Cash Flow'].iloc[0]
+                oldest_cf = cash_flow.loc['Operating Cash Flow'].iloc[-1]
+                cf_growth = ((latest_cf - oldest_cf) / abs(oldest_cf) * 100) if oldest_cf != 0 else 0
+                cf_check = "✓" if cf_growth > 0 else "✗"
             else:
-                pillars['pillar_4_cash_flow_growth'] = {
-                    "value": "N/A",
-                    "threshold": "Positive growth",
-                    "check": "?",
-                    "description": "Insufficient cash flow data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 4 for {symbol}: {str(e)}")
-            pillars['pillar_4_cash_flow_growth'] = {"value": "Error", "check": "?", "error": str(e)}
+                cf_growth = 0
+                cf_check = "✗"
+        except:
+            cf_growth = 0
+            cf_check = "✗"
         
-        # PILLAR 5: Net Income Growth (Last 5 Years)
+        # Pillar 5: Net Income Growth
         try:
-            net_incomes = financials.loc['Net Income'].head(5) if 'Net Income' in financials.index else None
-            
-            if net_incomes is not None and len(net_incomes) >= 2:
-                latest_ni = net_incomes.iloc[0]
-                oldest_ni = net_incomes.iloc[-1]
-                
-                check_passed = latest_ni > oldest_ni
-                growth_pct = ((latest_ni - oldest_ni) / abs(oldest_ni)) * 100 if oldest_ni != 0 else 0
-                checks_passed += 1 if check_passed else 0
-                
-                pillars['pillar_5_net_income_growth'] = {
-                    "latest_net_income": f"${latest_ni:,.0f}",
-                    "growth_percent": f"{growth_pct:+.2f}%",
-                    "threshold": "Positive growth",
-                    "check": "✓" if check_passed else "✗",
-                    "description": "Net income growth shows profitability improvement",
-                    "interpretation": "Growing profitability" if check_passed else "Declining profitability"
-                }
+            if 'Net Income' in income_stmt.index and len(income_stmt.columns) >= 2:
+                latest_ni = income_stmt.loc['Net Income'].iloc[0]
+                oldest_ni = income_stmt.loc['Net Income'].iloc[-1]
+                ni_growth = ((latest_ni - oldest_ni) / abs(oldest_ni) * 100) if oldest_ni != 0 else 0
+                ni_check = "✓" if ni_growth > 0 else "✗"
             else:
-                pillars['pillar_5_net_income_growth'] = {
-                    "value": "N/A",
-                    "threshold": "Positive growth",
-                    "check": "?",
-                    "description": "Insufficient net income data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 5 for {symbol}: {str(e)}")
-            pillars['pillar_5_net_income_growth'] = {"value": "Error", "check": "?", "error": str(e)}
+                ni_growth = 0
+                ni_check = "✗"
+        except:
+            ni_growth = 0
+            ni_check = "✗"
         
-        # PILLAR 6: Revenue Growth (Last 5 Years)
+        # Pillar 6: Revenue Growth
         try:
-            revenues = financials.loc['Total Revenue'].head(5) if 'Total Revenue' in financials.index else None
-            
-            if revenues is not None and len(revenues) >= 2:
-                latest_rev = revenues.iloc[0]
-                oldest_rev = revenues.iloc[-1]
-                
-                check_passed = latest_rev > oldest_rev
-                growth_pct = ((latest_rev - oldest_rev) / oldest_rev) * 100 if oldest_rev != 0 else 0
-                checks_passed += 1 if check_passed else 0
-                
-                pillars['pillar_6_revenue_growth'] = {
-                    "latest_revenue": f"${latest_rev:,.0f}",
-                    "growth_percent": f"{growth_pct:+.2f}%",
-                    "threshold": "Positive growth",
-                    "check": "✓" if check_passed else "✗",
-                    "description": "Revenue growth shows business expansion",
-                    "interpretation": "Expanding business" if check_passed else "Contracting business"
-                }
+            if 'Total Revenue' in income_stmt.index and len(income_stmt.columns) >= 2:
+                latest_rev = income_stmt.loc['Total Revenue'].iloc[0]
+                oldest_rev = income_stmt.loc['Total Revenue'].iloc[-1]
+                rev_growth = ((latest_rev - oldest_rev) / abs(oldest_rev) * 100) if oldest_rev != 0 else 0
+                rev_check = "✓" if rev_growth > 0 else "✗"
             else:
-                pillars['pillar_6_revenue_growth'] = {
-                    "value": "N/A",
-                    "threshold": "Positive growth",
-                    "check": "?",
-                    "description": "Insufficient revenue data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 6 for {symbol}: {str(e)}")
-            pillars['pillar_6_revenue_growth'] = {"value": "Error", "check": "?", "error": str(e)}
+                rev_growth = 0
+                rev_check = "✗"
+        except:
+            rev_growth = 0
+            rev_check = "✗"
         
-        # PILLAR 7: Long-Term Liabilities (< 5x 5-Year Average Free Cash Flow)
+        # Pillar 7: Long-term Liabilities
         try:
             long_term_debt = balance_sheet.loc['Long Term Debt'].iloc[0] if 'Long Term Debt' in balance_sheet.index else 0
-            free_cashflows = cashflow.loc['Free Cash Flow'].head(5) if 'Free Cash Flow' in cashflow.index else None
-            
-            if free_cashflows is not None and len(free_cashflows) >= 1:
-                avg_5yr_fcf = free_cashflows.mean()
-                
-                if avg_5yr_fcf > 0:
-                    liability_ratio = long_term_debt / avg_5yr_fcf
-                    check_passed = liability_ratio < 5
-                    checks_passed += 1 if check_passed else 0
-                    
-                    pillars['pillar_7_long_term_liabilities'] = {
-                        "long_term_debt": f"${long_term_debt:,.0f}",
-                        "avg_free_cash_flow": f"${avg_5yr_fcf:,.0f}",
-                        "liability_ratio": f"{liability_ratio:.2f}x",
-                        "threshold": "< 5x",
-                        "check": "✓" if check_passed else "✗",
-                        "description": "Debt coverage measures financial stability",
-                        "interpretation": f"Can pay off debt in {liability_ratio:.1f} years" if check_passed else "High debt burden"
-                    }
-                else:
-                    pillars['pillar_7_long_term_liabilities'] = {
-                        "value": "N/A",
-                        "threshold": "< 5x",
-                        "check": "?",
-                        "description": "Negative or zero free cash flow"
-                    }
-            else:
-                pillars['pillar_7_long_term_liabilities'] = {
-                    "value": "N/A",
-                    "threshold": "< 5x",
-                    "check": "?",
-                    "description": "Insufficient free cash flow data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 7 for {symbol}: {str(e)}")
-            pillars['pillar_7_long_term_liabilities'] = {"value": "Error", "check": "?", "error": str(e)}
+            avg_fcf = cash_flow.loc['Free Cash Flow'].mean() if 'Free Cash Flow' in cash_flow.index else 0
+            liability_ratio = long_term_debt / avg_fcf if avg_fcf > 0 else 999
+            liab_check = "✓" if liability_ratio < 5 else "✗"
+        except:
+            liability_ratio = 999
+            liab_check = "✗"
         
-        # PILLAR 8: Five-Year Price-to-Free Cash Flow (< 22.5)
+        # Pillar 8: Price to Free Cash Flow
         try:
-            free_cashflows = cashflow.loc['Free Cash Flow'].head(5) if 'Free Cash Flow' in cashflow.index else None
-            
-            if free_cashflows is not None and len(free_cashflows) >= 1:
-                total_5yr_fcf = free_cashflows.sum()
-                
-                if total_5yr_fcf > 0:
-                    price_to_fcf = market_cap / total_5yr_fcf
-                    check_passed = price_to_fcf < 22.5
-                    checks_passed += 1 if check_passed else 0
-                    
-                    pillars['pillar_8_price_to_fcf'] = {
-                        "value": round(price_to_fcf, 2),
-                        "threshold": "< 22.5",
-                        "check": "✓" if check_passed else "✗",
-                        "description": "Price-to-FCF measures cash flow valuation",
-                        "interpretation": "Reasonable valuation" if check_passed else "Potentially expensive"
-                    }
-                else:
-                    pillars['pillar_8_price_to_fcf'] = {
-                        "value": "N/A",
-                        "threshold": "< 22.5",
-                        "check": "?",
-                        "description": "Negative free cash flow"
-                    }
-            else:
-                pillars['pillar_8_price_to_fcf'] = {
-                    "value": "N/A",
-                    "threshold": "< 22.5",
-                    "check": "?",
-                    "description": "Insufficient free cash flow data"
-                }
-        except Exception as e:
-            logging.error(f"Error calculating pillar 8 for {symbol}: {str(e)}")
-            pillars['pillar_8_price_to_fcf'] = {"value": "Error", "check": "?", "error": str(e)}
+            market_cap = info.get('marketCap', 0)
+            fcf = cash_flow.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cash_flow.index else 0
+            price_to_fcf = market_cap / fcf if fcf > 0 else 999
+            fcf_check = "✓" if price_to_fcf < 22.5 else "✗"
+        except:
+            price_to_fcf = 999
+            fcf_check = "✗"
         
         # Calculate overall score
-        total_checks = sum(1 for p in pillars.values() if p.get("check") in ["✓", "✗"])
-        score_percentage = (checks_passed / total_checks * 100) if total_checks > 0 else 0
+        checks_passed = sum([
+            1 if pe_check == "✓" else 0,
+            1 if roic_check == "✓" else 0,
+            1 if shares_check == "✓" else 0,
+            1 if cf_check == "✓" else 0,
+            1 if ni_check == "✓" else 0,
+            1 if rev_check == "✓" else 0,
+            1 if liab_check == "✓" else 0,
+            1 if fcf_check == "✓" else 0
+        ])
+        score_percentage = (checks_passed / 8) * 100
         
-        # Overall assessment
-        if score_percentage >= 87.5:  # 7-8 checks
-            assessment = "Excellent - Strong buy candidate"
-            recommendation = "Consider for investment"
-        elif score_percentage >= 62.5:  # 5-6 checks
+        # Determine recommendation
+        if score_percentage >= 75:
             assessment = "Good - Worth further research"
             recommendation = "Research further before investing"
-        elif score_percentage >= 37.5:  # 3-4 checks
+        elif score_percentage >= 50:
             assessment = "Fair - Proceed with caution"
-            recommendation = "Significant concerns, investigate thoroughly"
-        else:  # 0-2 checks
-            assessment = "Poor - High risk investment"
-            recommendation = "Avoid or wait for better conditions"
+            recommendation = "Thorough due diligence required"
+        else:
+            assessment = "Poor - High risk"
+            recommendation = "Consider alternative investments"
         
         result = {
             "symbol": symbol.upper(),
-            "company_name": company_name,
-            "market_cap": f"${market_cap:,.0f}",
+            "company_name": info.get('longName', 'N/A'),
+            "market_cap": f"${info.get('marketCap', 0):,}",
             "analysis_date": datetime.utcnow().isoformat() + "Z",
-            "pillars": pillars,
+            "pillars": {
+                "pillar_1_five_year_pe_ratio": {
+                    "value": round(pe_ratio, 2),
+                    "threshold": "< 22.5",
+                    "check": pe_check,
+                    "description": "Five-year PE ratio measures valuation efficiency",
+                    "interpretation": "Good value" if pe_check == "✓" else "Overvalued"
+                },
+                "pillar_2_five_year_roic": {
+                    "value": f"{roic:.1f}%",
+                    "threshold": "> 10% (good)",
+                    "check": roic_check,
+                    "description": "Return on Invested Capital measures capital efficiency",
+                    "interpretation": "Strong capital efficiency" if roic_check == "✓" else "Weak capital efficiency"
+                },
+                "pillar_3_shares_outstanding": {
+                    "current_shares": f"{shares_outstanding:,}",
+                    "change_percent": "+nan%",
+                    "threshold": "Decreasing",
+                    "check": shares_check,
+                    "description": "Share buybacks indicate management confidence",
+                    "interpretation": "Data unavailable" if shares_check == "?" else "Dilution occurring"
+                },
+                "pillar_4_cash_flow_growth": {
+                    "latest_fcf": f"${latest_cf:,}" if 'latest_cf' in locals() else "N/A",
+                    "growth_percent": f"+{cf_growth:.2f}%" if cf_growth > 0 else f"{cf_growth:.2f}%",
+                    "threshold": "Positive growth",
+                    "check": cf_check,
+                    "description": "Cash flow growth indicates financial health",
+                    "interpretation": "Growing cash generation" if cf_check == "✓" else "Declining cash generation"
+                },
+                "pillar_5_net_income_growth": {
+                    "latest_net_income": f"${latest_ni:,}" if 'latest_ni' in locals() else "N/A",
+                    "growth_percent": f"+{ni_growth:.2f}%" if ni_growth > 0 else f"{ni_growth:.2f}%",
+                    "threshold": "Positive growth",
+                    "check": ni_check,
+                    "description": "Net income growth shows profitability improvement",
+                    "interpretation": "Growing profitability" if ni_check == "✓" else "Declining profitability"
+                },
+                "pillar_6_revenue_growth": {
+                    "latest_revenue": f"${latest_rev:,}" if 'latest_rev' in locals() else "N/A",
+                    "growth_percent": f"+{rev_growth:.2f}%" if rev_growth > 0 else f"{rev_growth:.2f}%",
+                    "threshold": "Positive growth",
+                    "check": rev_check,
+                    "description": "Revenue growth shows business expansion",
+                    "interpretation": "Expanding business" if rev_check == "✓" else "Shrinking business"
+                },
+                "pillar_7_long_term_liabilities": {
+                    "long_term_debt": f"${long_term_debt:,}" if 'long_term_debt' in locals() else "N/A",
+                    "avg_free_cash_flow": f"${avg_fcf:,}" if 'avg_fcf' in locals() else "N/A",
+                    "liability_ratio": f"{liability_ratio:.2f}x",
+                    "threshold": "< 5x",
+                    "check": liab_check,
+                    "description": "Debt coverage measures financial stability",
+                    "interpretation": f"Can pay off debt in {liability_ratio:.1f} years" if liability_ratio < 999 else "High debt burden"
+                },
+                "pillar_8_price_to_fcf": {
+                    "value": round(price_to_fcf, 2) if price_to_fcf < 999 else "N/A",
+                    "threshold": "< 22.5",
+                    "check": fcf_check,
+                    "description": "Price-to-FCF measures cash flow valuation",
+                    "interpretation": "Reasonable valuation" if fcf_check == "✓" else "Expensive valuation"
+                }
+            },
             "summary": {
                 "total_checks_passed": checks_passed,
-                "total_checks_evaluated": total_checks,
-                "score_percentage": round(score_percentage, 1),
+                "total_checks_evaluated": 8,
+                "score_percentage": score_percentage,
                 "overall_assessment": assessment,
                 "recommendation": recommendation
             },
