@@ -32,6 +32,9 @@ from handlers.financial_calculators import (
 # Initialize Azure Functions app
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
+# Import and register HTTP wrappers
+from http_wrappers import create_http_wrappers
+
 
 # ============================================================================
 # BASIC TOOLS
@@ -155,8 +158,15 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "service": "financi-mcp",
-            "version": "1.1.0",
+            "version": "1.2.0",
             "mcp_endpoint": "/runtime/webhooks/mcp/sse",
+            "http_endpoints": {
+                "stock_price": "/api/stock/price",
+                "portfolio_value": "/api/stock/portfolio",
+                "eight_pillar_analysis": "/api/stock/eight-pillar",
+                "compound_interest": "/api/calculator/compound-interest",
+                "retirement_calculator": "/api/calculator/retirement"
+            },
             "tools": [
                 "hello_financi",
                 "get_stock_price",
@@ -169,3 +179,10 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         headers={"Content-Type": "application/json"}
     )
+
+
+# ============================================================================
+# HTTP WRAPPERS FOR MCP TOOLS
+# ============================================================================
+# Register HTTP endpoints that provide RESTful access to MCP tool handlers
+create_http_wrappers(app)
