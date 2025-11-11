@@ -253,32 +253,15 @@ stages:
                   exit 1
                 fi
           
-          - task: AzureCLI@2
-            displayName: 'Install Azure Functions Core Tools and Deploy'
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy Function App Package'
             inputs:
               azureSubscription: $(azureServiceConnection)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Install Azure Functions Core Tools
-                echo "Installing Azure Functions Core Tools..."
-                npm install -g azure-functions-core-tools@4 --unsafe-perm true
-                
-                # Extract the function app package
-                echo "Extracting function app package..."
-                mkdir -p /tmp/function-deploy
-                cd /tmp/function-deploy
-                unzip -q $(Pipeline.Workspace)/function-app/function-app.zip
-                
-                # List contents to verify
-                echo "Function app contents:"
-                ls -la
-                
-                # Deploy using func tools (same method that worked manually)
-                echo "Deploying to $(verifiedFunctionAppName) using func tools..."
-                func azure functionapp publish $(verifiedFunctionAppName) --python --build remote
-                
-                echo "✅ Function deployment completed"
+              appType: 'functionAppLinux'
+              appName: '$(verifiedFunctionAppName)'
+              package: '$(Pipeline.Workspace)/function-app/function-app.zip'
+              runtimeStack: 'PYTHON|3.11'
+              deploymentMethod: 'zipDeploy'
           
           - task: AzureCLI@2
             displayName: 'Configure Function App Settings'
