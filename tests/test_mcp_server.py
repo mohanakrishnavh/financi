@@ -181,7 +181,7 @@ class TestHealthEndpoint:
         assert response_data["status"] == "healthy"
         assert "timestamp" in response_data
         assert response_data["service"] == "financi-mcp"
-        assert response_data["version"] == "1.2.0"  # Updated to 1.2.0
+        assert response_data["version"] == "1.4.0"  # Updated to 1.4.0
         assert "http_endpoints" in response_data  # Now includes HTTP endpoints
         assert "tools" in response_data
     
