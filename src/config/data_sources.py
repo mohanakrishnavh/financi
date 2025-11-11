@@ -32,9 +32,9 @@ class DataSourceConfig:
             os.environ.get('ALPHA_VANTAGE_RATE_LIMIT', '25')
         )
         
-        # Cache duration in seconds (default: 5 minutes)
+        # Cache duration in seconds (default: 1 day)
         self.cache_duration = int(
-            os.environ.get('CACHE_DURATION_SECONDS', '300')
+            os.environ.get('CACHE_DURATION_SECONDS', '86400')
         )
     
     def is_alpha_vantage_enabled(self) -> bool:
