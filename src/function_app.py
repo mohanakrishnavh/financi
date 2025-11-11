@@ -158,7 +158,7 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "service": "financi-mcp",
-            "version": "1.3.0",
+            "version": "1.4.0",
             "mcp_endpoint": "/runtime/webhooks/mcp/sse",
             "http_endpoints": {
                 "stock_price": "/api/stock/price",

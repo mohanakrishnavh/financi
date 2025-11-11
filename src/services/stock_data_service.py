@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.data_sources import get_data_source_config, DataSource
+from services.fmp import FMPClient
 from services.alpha_vantage import AlphaVantageClient
 from services.yahoo_finance import YahooFinanceClient
 
@@ -21,13 +22,19 @@ class StockDataService:
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.cache_timestamps: Dict[str, datetime] = {}
         
-        # Initialize clients
+        # Initialize FMP client
+        self.fmp_client = None
+        if self.config.is_fmp_enabled():
+            self.fmp_client = FMPClient(self.config.fmp_api_key)
+        
+        # Initialize Alpha Vantage client
         self.alpha_vantage_client = None
         if self.config.is_alpha_vantage_enabled():
             self.alpha_vantage_client = AlphaVantageClient(
                 self.config.alpha_vantage_api_key
             )
         
+        # Initialize Yahoo Finance client (always available, no API key needed)
         self.yahoo_finance_client = YahooFinanceClient()
     
     def _get_cache_key(self, operation: str, symbol: str) -> str:
@@ -55,13 +62,13 @@ class StockDataService:
     
     def get_stock_quote(self, symbol: str) -> Dict[str, Any]:
         """
-        Get stock quote from configured data source with fallback.
+        Get stock quote from configured data source with fallback chain.
         
         Args:
             symbol: Stock ticker symbol
         
         Returns:
-            Dictionary with stock quote data
+            Dictionary with stock quote data including metadata
         """
         cache_key = self._get_cache_key('quote', symbol)
         
@@ -69,58 +76,84 @@ class StockDataService:
         cached_data = self._get_cache(cache_key)
         if cached_data:
             cached_data['from_cache'] = True
+            print(f"✅ Returning cached data for {symbol} (source: {cached_data.get('data_source', 'unknown')})")
             return cached_data
         
+        # Get primary source and fallback chain
         primary_source = self.config.get_primary_source()
+        fallback_sources = self.config.get_fallback_sources()
         
-        # Try primary source
-        try:
-            if primary_source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
-                print(f"Fetching quote for {symbol} from Alpha Vantage...")
-                data = self.alpha_vantage_client.get_quote(symbol)
-                self._set_cache(cache_key, data)
-                return data
-            else:
-                print(f"Fetching quote for {symbol} from Yahoo Finance...")
-                data = self.yahoo_finance_client.get_quote(symbol)
-                self._set_cache(cache_key, data)
-                return data
-        except Exception as e:
-            print(f"⚠️  Primary source ({primary_source.value}) failed: {str(e)}")
-            
-            # Try fallback source
-            fallback_source = self.config.get_fallback_source()
-            if fallback_source and fallback_source != primary_source:
-                try:
-                    print(f"Attempting fallback to {fallback_source.value}...")
-                    if fallback_source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
-                        data = self.alpha_vantage_client.get_quote(symbol)
+        # Create complete source chain: primary + fallbacks
+        source_chain = [primary_source] + [s for s in fallback_sources if s != primary_source]
+        
+        # Try each source in order
+        last_error = None
+        for idx, source in enumerate(source_chain):
+            try:
+                is_primary = (idx == 0)
+                data = self._fetch_quote_from_source(symbol, source, is_primary)
+                
+                if data:
+                    # Add metadata
+                    data['from_cache'] = False
+                    data['data_source'] = source.value
+                    if not is_primary:
                         data['fallback_used'] = True
-                        data['primary_source_error'] = str(e)
-                        self._set_cache(cache_key, data)
-                        return data
-                    else:
-                        data = self.yahoo_finance_client.get_quote(symbol)
-                        data['fallback_used'] = True
-                        data['primary_source_error'] = str(e)
-                        self._set_cache(cache_key, data)
-                        print(f"✅ Fallback to {fallback_source.value} successful")
-                        return data
-                except Exception as fallback_error:
-                    print(f"❌ Fallback source ({fallback_source.value}) also failed: {str(fallback_error)}")
-            
-            # Both failed, raise original error
-            raise
+                        data['primary_source'] = primary_source.value
+                        if last_error:
+                            data['primary_source_error'] = str(last_error)
+                    
+                    # Cache the successful result
+                    self._set_cache(cache_key, data)
+                    print(f"✅ Successfully fetched {symbol} from {source.value}")
+                    return data
+                    
+            except Exception as e:
+                last_error = e
+                source_name = source.value
+                print(f"⚠️  {source_name} failed for {symbol}: {str(e)}")
+                if idx < len(source_chain) - 1:
+                    next_source = source_chain[idx + 1].value
+                    print(f"   Trying next source: {next_source}...")
+        
+        # All sources failed
+        error_msg = f"All data sources failed for {symbol}. Last error: {str(last_error)}"
+        print(f"❌ {error_msg}")
+        raise ValueError(error_msg)
+    
+    def _fetch_quote_from_source(self, symbol: str, source: DataSource, is_primary: bool) -> Dict[str, Any]:
+        """
+        Fetch quote from a specific data source.
+        
+        Args:
+            symbol: Stock ticker symbol
+            source: Data source to use
+            is_primary: Whether this is the primary source
+        
+        Returns:
+            Quote data dictionary
+        """
+        source_label = "primary" if is_primary else "fallback"
+        print(f"Fetching quote for {symbol} from {source.value} ({source_label})...")
+        
+        if source == DataSource.FMP and self.fmp_client:
+            return self.fmp_client.get_quote(symbol)
+        elif source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
+            return self.alpha_vantage_client.get_quote(symbol)
+        elif source == DataSource.YAHOO_FINANCE:
+            return self.yahoo_finance_client.get_quote(symbol)
+        else:
+            raise ValueError(f"Data source {source.value} is not available or not configured")
     
     def get_company_overview(self, symbol: str) -> Dict[str, Any]:
         """
-        Get company overview and fundamental data.
+        Get company overview and fundamental data with fallback chain.
         
         Args:
             symbol: Stock ticker symbol
         
         Returns:
-            Dictionary with company data
+            Dictionary with company data including metadata
         """
         cache_key = self._get_cache_key('overview', symbol)
         
@@ -128,46 +161,74 @@ class StockDataService:
         cached_data = self._get_cache(cache_key)
         if cached_data:
             cached_data['from_cache'] = True
+            print(f"✅ Returning cached overview for {symbol} (source: {cached_data.get('data_source', 'unknown')})")
             return cached_data
         
+        # Get primary source and fallback chain
         primary_source = self.config.get_primary_source()
+        fallback_sources = self.config.get_fallback_sources()
         
-        try:
-            if primary_source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
-                print(f"Fetching company overview for {symbol} from Alpha Vantage...")
-                data = self.alpha_vantage_client.get_company_overview(symbol)
-                self._set_cache(cache_key, data)
-                return data
-            else:
-                print(f"Fetching company info for {symbol} from Yahoo Finance...")
-                data = self.yahoo_finance_client.get_company_info(symbol)
-                self._set_cache(cache_key, data)
-                return data
-        except Exception as e:
-            print(f"⚠️  Primary source failed: {str(e)}")
-            
-            # Try fallback
-            fallback_source = self.config.get_fallback_source()
-            if fallback_source and fallback_source != primary_source:
-                try:
-                    print(f"Attempting fallback to {fallback_source.value}...")
-                    if fallback_source == DataSource.YAHOO_FINANCE:
-                        data = self.yahoo_finance_client.get_company_info(symbol)
+        # Create complete source chain
+        source_chain = [primary_source] + [s for s in fallback_sources if s != primary_source]
+        
+        # Try each source in order
+        last_error = None
+        for idx, source in enumerate(source_chain):
+            try:
+                is_primary = (idx == 0)
+                data = self._fetch_overview_from_source(symbol, source, is_primary)
+                
+                if data:
+                    # Add metadata
+                    data['from_cache'] = False
+                    data['data_source'] = source.value
+                    if not is_primary:
                         data['fallback_used'] = True
-                        data['primary_source_error'] = str(e)
-                        self._set_cache(cache_key, data)
-                        print(f"✅ Fallback to {fallback_source.value} successful")
-                        return data
-                    elif fallback_source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
-                        data = self.alpha_vantage_client.get_company_overview(symbol)
-                        data['fallback_used'] = True
-                        data['primary_source_error'] = str(e)
-                        self._set_cache(cache_key, data)
-                        return data
-                except Exception as fallback_error:
-                    print(f"❌ Fallback also failed: {str(fallback_error)}")
-            
-            raise
+                        data['primary_source'] = primary_source.value
+                        if last_error:
+                            data['primary_source_error'] = str(last_error)
+                    
+                    # Cache the successful result
+                    self._set_cache(cache_key, data)
+                    print(f"✅ Successfully fetched overview for {symbol} from {source.value}")
+                    return data
+                    
+            except Exception as e:
+                last_error = e
+                source_name = source.value
+                print(f"⚠️  {source_name} failed for {symbol}: {str(e)}")
+                if idx < len(source_chain) - 1:
+                    next_source = source_chain[idx + 1].value
+                    print(f"   Trying next source: {next_source}...")
+        
+        # All sources failed
+        error_msg = f"All data sources failed for {symbol}. Last error: {str(last_error)}"
+        print(f"❌ {error_msg}")
+        raise ValueError(error_msg)
+    
+    def _fetch_overview_from_source(self, symbol: str, source: DataSource, is_primary: bool) -> Dict[str, Any]:
+        """
+        Fetch company overview from a specific data source.
+        
+        Args:
+            symbol: Stock ticker symbol
+            source: Data source to use
+            is_primary: Whether this is the primary source
+        
+        Returns:
+            Company overview data dictionary
+        """
+        source_label = "primary" if is_primary else "fallback"
+        print(f"Fetching overview for {symbol} from {source.value} ({source_label})...")
+        
+        if source == DataSource.FMP and self.fmp_client:
+            return self.fmp_client.get_company_profile(symbol)
+        elif source == DataSource.ALPHA_VANTAGE and self.alpha_vantage_client:
+            return self.alpha_vantage_client.get_company_overview(symbol)
+        elif source == DataSource.YAHOO_FINANCE:
+            return self.yahoo_finance_client.get_company_info(symbol)
+        else:
+            raise ValueError(f"Data source {source.value} is not available or not configured")
 
 
 # Global service instance
