@@ -44,6 +44,32 @@ stages:
       displayName: 'Use Python $(pythonVersion)'
     
     - script: |
+        # Extract version from multiple sources (with fallback)
+        
+        # Method 1: Try VERSION file first (single source of truth)
+        if [ -f "VERSION" ]; then
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "✅ Version from VERSION file: $VERSION"
+        else
+          # Method 2: Fallback to extracting from function_app.py
+          VERSION=$(grep -oP '"version":\s*"\K[^"]+' src/function_app.py | head -1)
+          echo "✅ Version from function_app.py: $VERSION"
+        fi
+        
+        # Validate version format (semver: X.Y.Z)
+        if [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "✅ Valid version format: $VERSION"
+          echo "##vso[task.setvariable variable=appVersion;isOutput=true]$VERSION"
+        else
+          echo "❌ Invalid version format: $VERSION"
+          echo "Version must follow semantic versioning (e.g., 1.2.0)"
+          exit 1
+        fi
+      displayName: 'Extract Application Version'
+      name: 'getVersion'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+    
+    - script: |
         # Upgrade pip and install build tools
         python -m pip install --upgrade pip wheel setuptools
         
@@ -193,6 +219,7 @@ stages:
     environment: 'function-app'
     variables:
       functionAppName: $[ stageDependencies.DeployInfrastructure.DeployBicep.outputs['getFunctionAppName.functionAppName'] ]
+      appVersion: $[ stageDependencies.Build.Build.outputs['getVersion.appVersion'] ]
     strategy:
       runOnce:
         deploy:
@@ -260,13 +287,15 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
+                echo "Configuring Function App with version: $(appVersion)"
+                
                 # Set environment variables including API key
                 az functionapp config appsettings set \
                   --name $(verifiedFunctionAppName) \
                   --resource-group $(resourceGroupName) \
                   --settings \
                     "MCP_SERVER_NAME=financi" \
-                    "MCP_SERVER_VERSION=1.0.0" \
+                    "MCP_SERVER_VERSION=$(appVersion)" \
                     "LOGGING_LEVEL=INFO" \
                     "ALPHA_VANTAGE_API_KEY=$(alphaVantageApiKey)" \
                     "FUNCTIONS_WORKER_RUNTIME=python" \
