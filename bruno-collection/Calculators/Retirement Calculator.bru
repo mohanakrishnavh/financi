@@ -1,0 +1,56 @@
+meta {
+  name: Retirement Calculator
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/calculator/retirement?code={{functionKey}}
+  body: json
+  auth: none
+}
+
+params:query {
+  code: {{functionKey}}
+}
+
+body:json {
+  {
+    "current_age": 30,
+    "retirement_age": 65,
+    "current_savings": 50000,
+    "monthly_contribution": 1000,
+    "annual_return": 7,
+    "inflation_rate": 2.5
+  }
+}
+
+docs {
+  # Retirement Calculator
+  
+  Calculate retirement savings projections with inflation adjustment.
+  
+  Query Parameters:
+  - code (required): Azure Function key for authentication
+  
+  Request Body (JSON):
+  - current_age (required): Your current age (18-100)
+  - retirement_age (required): Target retirement age (must be > current_age)
+  - current_savings (required): Current retirement savings (must be >= 0)
+  - monthly_contribution (required): Monthly savings amount (must be >= 0)
+  - annual_return (required): Expected annual return rate as percentage (e.g., 7 for 7%)
+  - inflation_rate (optional): Expected inflation rate as percentage (default: 2.5)
+  
+  Returns:
+  - years_to_retirement: Number of years until retirement
+  - total_contributions: Total amount you'll contribute
+  - nominal_value: Final value without inflation adjustment
+  - real_value: Inflation-adjusted final value (purchasing power)
+  - inflation_impact: Amount lost to inflation
+  - monthly_income_at_retirement: Estimated monthly income in retirement
+  
+  Example scenarios:
+  - 30-year-old with $50k, saving $1k/month until 65
+  - 40-year-old with $100k, saving $1.5k/month until 67
+  - 25-year-old with $10k, saving $500/month until 60
+}

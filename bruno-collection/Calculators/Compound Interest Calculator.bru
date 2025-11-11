@@ -1,0 +1,58 @@
+meta {
+  name: Compound Interest Calculator
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/calculator/compound-interest?code={{functionKey}}
+  body: json
+  auth: none
+}
+
+params:query {
+  code: {{functionKey}}
+}
+
+body:json {
+  {
+    "principal": 10000,
+    "rate": 7,
+    "time": 10,
+    "frequency": 12
+  }
+}
+
+docs {
+  # Compound Interest Calculator
+  
+  Calculate compound interest growth over time.
+  
+  Query Parameters:
+  - code (required): Azure Function key for authentication
+  
+  Request Body (JSON):
+  - principal (required): Initial investment amount (must be positive)
+  - rate (required): Annual interest rate as percentage (e.g., 7 for 7%)
+  - time (required): Investment period in years (must be positive)
+  - frequency (optional): Compounding frequency per year
+    - 1 = Annual
+    - 2 = Semi-annual
+    - 4 = Quarterly
+    - 12 = Monthly (default)
+    - 365 = Daily
+  
+  Returns:
+  - principal: Initial investment
+  - rate: Interest rate used
+  - time: Investment period
+  - frequency: Compounding frequency
+  - final_amount: Total value after compound interest
+  - total_interest: Total interest earned
+  - effective_rate: Effective annual rate
+  
+  Example scenarios:
+  - $10,000 at 7% for 10 years, monthly compounding
+  - $5,000 at 5% for 20 years, quarterly compounding
+  - $50,000 at 8% for 5 years, daily compounding
+}

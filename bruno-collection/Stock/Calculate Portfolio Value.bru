@@ -1,0 +1,48 @@
+meta {
+  name: Calculate Portfolio Value
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/stock/portfolio?code={{functionKey}}
+  body: json
+  auth: none
+}
+
+params:query {
+  code: {{functionKey}}
+}
+
+body:json {
+  {
+    "symbol": "AAPL",
+    "shares": 100
+  }
+}
+
+docs {
+  # Calculate Portfolio Value
+  
+  Calculate the total value of a stock position based on current market price.
+  
+  Query Parameters:
+  - code (required): Azure Function key for authentication
+  
+  Request Body (JSON):
+  - symbol (required): Stock ticker symbol
+  - shares (required): Number of shares owned (must be positive)
+  
+  Returns:
+  - symbol: Stock ticker
+  - shares: Number of shares
+  - price_per_share: Current price per share
+  - total_value: Total portfolio value (shares × price)
+  - currency: Currency code
+  - timestamp: Calculation timestamp
+  
+  Example portfolios to calculate:
+  - 100 shares of AAPL
+  - 50 shares of MSFT
+  - 25 shares of GOOGL
+}

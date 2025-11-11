@@ -1,0 +1,46 @@
+meta {
+  name: Get Stock Price
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/stock/price?code={{functionKey}}&symbol=AAPL
+  body: none
+  auth: none
+}
+
+params:query {
+  code: {{functionKey}}
+  symbol: AAPL
+}
+
+docs {
+  # Get Stock Price
+  
+  Retrieve current stock price and related data for a given symbol.
+  
+  Query Parameters:
+  - symbol (required): Stock ticker symbol (e.g., AAPL, MSFT, GOOGL)
+  - code (required): Azure Function key for authentication
+  
+  Example symbols to try:
+  - AAPL (Apple)
+  - MSFT (Microsoft)
+  - GOOGL (Google)
+  - TSLA (Tesla)
+  - AMZN (Amazon)
+  
+  Returns:
+  - symbol: Stock ticker
+  - current_price: Current stock price
+  - currency: Currency code
+  - previous_close: Previous closing price
+  - day_high: Highest price today
+  - day_low: Lowest price today
+  - volume: Trading volume
+  - market_cap: Market capitalization
+  - pe_ratio: Price-to-earnings ratio
+  - dividend_yield: Dividend yield percentage
+  - timestamp: Data timestamp
+}

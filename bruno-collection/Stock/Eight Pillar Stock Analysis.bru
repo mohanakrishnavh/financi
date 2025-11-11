@@ -1,0 +1,58 @@
+meta {
+  name: Eight Pillar Stock Analysis
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/stock/eight-pillar?code={{functionKey}}&symbol=MSFT
+  body: none
+  auth: none
+}
+
+params:query {
+  code: {{functionKey}}
+  symbol: MSFT
+}
+
+docs {
+  # Eight Pillar Stock Analysis
+  
+  Comprehensive stock analysis using the Eight Pillar methodology.
+  
+  Query Parameters:
+  - symbol (required): Stock ticker symbol
+  - code (required): Azure Function key for authentication
+  
+  Analyzes 8 key dimensions:
+  1. **Valuation** - P/E ratio, PEG ratio, price-to-book
+  2. **Financial Health** - Debt ratios, current ratio, interest coverage
+  3. **Profitability** - Profit margins, ROE, ROA
+  4. **Growth** - Revenue growth, earnings growth, EPS growth
+  5. **Efficiency** - Asset turnover, inventory turnover
+  6. **Momentum** - Price trends, moving averages, RSI
+  7. **Quality** - Free cash flow, ROIC, earnings quality
+  8. **Dividend** - Yield, payout ratio, dividend growth
+  
+  Each pillar receives a score (0-10) with commentary and recommendation.
+  
+  Example stocks for analysis:
+  - MSFT (Microsoft) - Tech giant
+  - AAPL (Apple) - Consumer tech
+  - JNJ (Johnson & Johnson) - Healthcare
+  - JPM (JPMorgan Chase) - Financial
+  - WMT (Walmart) - Retail
+  
+  Returns:
+  - symbol: Stock ticker
+  - company_name: Full company name
+  - analysis_date: When analysis was performed
+  - overall_score: Aggregate score across all pillars
+  - recommendation: BUY/HOLD/SELL recommendation
+  - pillars: Detailed analysis for each of 8 pillars
+    - pillar_name: Name of the pillar
+    - score: Score out of 10
+    - metrics: Key financial metrics
+    - commentary: Analysis and insights
+  - summary: Executive summary of the analysis
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  # Health Check
+  
+  Check the health status of the Financi API.
+  
+  Returns:
+  - status: "healthy"
+  - version: API version
+  - timestamp: Current server time
+  - mcp_tools: List of available MCP tools
+  - http_endpoints: List of available HTTP endpoints
+}

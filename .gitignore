@@ -184,6 +184,7 @@ keys.txt
 *.json
 !parameters.json
 !package.json
+!bruno-collection/**/*.json
 
 # OS generated files
 .DS_Store
